@@ -63,11 +63,19 @@ export class GameScene extends Phaser.Scene {
   private bossBarGfx!: Phaser.GameObjects.Graphics;
   private bossNameText!: Phaser.GameObjects.Text;
 
-  // Votação
+  // Votação Compacta Superior (HUD)
   private voteContainer!: Phaser.GameObjects.Container;
   private voteTitleText!: Phaser.GameObjects.Text;
+  private voteInstructionText!: Phaser.GameObjects.Text;
   private voteTimerText!: Phaser.GameObjects.Text;
-  private voteOptionTexts: Phaser.GameObjects.Text[] = [];
+  private voteTimerBarGfx!: Phaser.GameObjects.Graphics;
+  private voteOptionCards: Array<{
+    cardX: number;
+    cardY: number;
+    cardBg: Phaser.GameObjects.Graphics;
+    titleTxt: Phaser.GameObjects.Text;
+    votesTxt: Phaser.GameObjects.Text;
+  }> = [];
 
   // Anúncios flutuantes
   private announcementContainer!: Phaser.GameObjects.Container;
@@ -324,37 +332,75 @@ export class GameScene extends Phaser.Scene {
     });
     this.hudContainer.add([this.goalText, goalRewardSub]);
 
-    // Modal de Votação (Centro da tela vertical)
-    this.voteContainer = this.add.container(width / 2, height / 2 - 30).setVisible(false).setDepth(150);
+    // Painel Compacto de Votação (Região superior, logo abaixo do cabeçalho)
+    this.voteContainer = this.add.container(width / 2, 188).setVisible(false).setDepth(130);
+
     const voteBg = this.add.graphics();
-    voteBg.fillStyle(0x0f172a, 0.96);
-    voteBg.fillRoundedRect(-380, -180, 760, 360, 16);
-    voteBg.lineStyle(4, 0x06b6d4, 1);
-    voteBg.strokeRoundedRect(-380, -180, 760, 360, 16);
-    this.voteTitleText = this.add.text(0, -140, '⚡ NÍVEL ALCANÇADO! VOTAÇÃO DOS ESPECTADORES', {
+    voteBg.fillStyle(0x090d16, 0.90);
+    voteBg.fillRoundedRect(-490, -58, 980, 116, 12);
+    voteBg.lineStyle(2, 0x06b6d4, 0.85);
+    voteBg.strokeRoundedRect(-490, -58, 980, 116, 12);
+
+    // Barra de progresso discreta do tempo restante na borda inferior do painel
+    this.voteTimerBarGfx = this.add.graphics();
+
+    // Linha superior: Título, Instrução e Tempo restante
+    this.voteTitleText = this.add.text(-470, -36, '⚡ VOTAÇÃO DOS ESPECTADORES', {
       fontFamily: 'Segoe UI, sans-serif',
-      fontSize: '22px',
+      fontSize: '15px',
       color: '#38bdf8',
       fontStyle: 'bold'
-    }).setOrigin(0.5);
-    this.voteTimerText = this.add.text(0, -100, 'Digite no chat: VOTAR 1, VOTAR 2 ou VOTAR 3 (⏱️ 15s)', {
+    }).setOrigin(0, 0.5);
+
+    this.voteInstructionText = this.add.text(-185, -36, '💬 Digite no chat: VOTAR 1, VOTAR 2 ou VOTAR 3', {
       fontFamily: 'Segoe UI, sans-serif',
-      fontSize: '18px',
+      fontSize: '14px',
+      color: '#cbd5e1'
+    }).setOrigin(0, 0.5);
+
+    this.voteTimerText = this.add.text(470, -36, '⏱️ 15s', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: '14px',
       color: '#facc15',
-      fontStyle: 'bold'
-    }).setOrigin(0.5);
-    this.voteContainer.add([voteBg, this.voteTitleText, this.voteTimerText]);
+      fontStyle: 'bold',
+      backgroundColor: 'rgba(234, 179, 8, 0.15)',
+      padding: { x: 8, y: 3 }
+    }).setOrigin(1, 0.5);
+
+    this.voteContainer.add([voteBg, this.voteTimerBarGfx, this.voteTitleText, this.voteInstructionText, this.voteTimerText]);
+
+    // 3 Cards Compactos Horizontais Lado a Lado
+    this.voteOptionCards = [];
+    const cardPositions = [-320, 0, 320];
 
     for (let i = 0; i < 3; i++) {
-      const optTxt = this.add.text(0, -40 + i * 65, `Opção ${i + 1}`, {
+      const cardX = cardPositions[i];
+      const cardY = 17;
+
+      const cardBg = this.add.graphics();
+
+      const titleTxt = this.add.text(cardX, cardY - 11, `${i + 1}. Opção`, {
         fontFamily: 'Segoe UI, sans-serif',
-        fontSize: '20px',
-        color: '#f8fafc',
-        backgroundColor: '#1e293b',
-        padding: { x: 20, y: 12 }
+        fontSize: '14px',
+        color: '#ffffff',
+        fontStyle: 'bold'
       }).setOrigin(0.5);
-      this.voteOptionTexts.push(optTxt);
-      this.voteContainer.add(optTxt);
+
+      const votesTxt = this.add.text(cardX, cardY + 11, '0 votos', {
+        fontFamily: 'Segoe UI, sans-serif',
+        fontSize: '12px',
+        color: '#38bdf8'
+      }).setOrigin(0.5);
+
+      this.voteOptionCards.push({
+        cardX,
+        cardY,
+        cardBg,
+        titleTxt,
+        votesTxt
+      });
+
+      this.voteContainer.add([cardBg, titleTxt, votesTxt]);
     }
 
     // Tela de Fim / Pausa / Contagem
@@ -627,13 +673,45 @@ export class GameScene extends Phaser.Scene {
       this.bossBarContainer.setVisible(false);
     }
 
-    // 6. Votação
+    // 6. Votação Compacta (Região superior, sem cobrir arena/combate)
     if (snap.activeVote && snap.activeVote.active) {
       this.voteContainer.setVisible(true);
-      this.voteTimerText.setText(`Digite no chat: VOTAR 1, VOTAR 2 ou VOTAR 3 (⏱️ ${Math.ceil(snap.activeVote.timeRemainingSeconds)}s)`);
+
+      // Ajusta dinamicamente a posição caso a barra de chefe esteja presente
+      this.voteContainer.y = snap.wave.isBossActive ? 250 : 188;
+
+      const remaining = Math.max(0, snap.activeVote.timeRemainingSeconds);
+      const totalDuration = snap.activeVote.durationSeconds || 15;
+      this.voteTimerText.setText(`⏱️ ${Math.ceil(remaining)}s`);
+
+      // Atualiza a barra fina de progresso do tempo
+      this.voteTimerBarGfx.clear();
+      const timeRatio = Math.min(1, Math.max(0, remaining / totalDuration));
+      this.voteTimerBarGfx.fillStyle(0x06b6d4, 0.9);
+      this.voteTimerBarGfx.fillRoundedRect(-486, 52, 972 * timeRatio, 4, 2);
+
+      // Encontra a maior contagem de votos para destaque sutil
+      const maxVotes = Math.max(...snap.activeVote.options.map(o => o.votes), 0);
+
       snap.activeVote.options.forEach((opt, idx) => {
-        if (this.voteOptionTexts[idx]) {
-          this.voteOptionTexts[idx].setText(`[${opt.id}] ${opt.title} (${opt.description}) — ${opt.votes} Votos`);
+        const card = this.voteOptionCards[idx];
+        if (card) {
+          const isLeading = maxVotes > 0 && opt.votes === maxVotes;
+
+          // Redesenha fundo do card com destaque para a opção líder
+          card.cardBg.clear();
+          card.cardBg.fillStyle(isLeading ? 0x1e2e4a : 0x111927, 0.90);
+          card.cardBg.fillRoundedRect(card.cardX - 150, card.cardY - 26, 300, 52, 8);
+          card.cardBg.lineStyle(1.5, isLeading ? 0x38bdf8 : 0x334155, isLeading ? 1 : 0.7);
+          card.cardBg.strokeRoundedRect(card.cardX - 150, card.cardY - 26, 300, 52, 8);
+
+          card.titleTxt.setText(`${opt.id}. ${opt.title}`);
+
+          const votePlural = opt.votes === 1 ? 'voto' : 'votos';
+          const descSnippet = opt.description ? ` • ${opt.description}` : '';
+          const displayDesc = descSnippet.length > 20 ? descSnippet.substring(0, 18) + '…' : descSnippet;
+          card.votesTxt.setText(`🗳️ ${opt.votes} ${votePlural}${displayDesc}`);
+          card.votesTxt.setColor(isLeading ? '#facc15' : '#38bdf8');
         }
       });
     } else {
@@ -915,6 +993,9 @@ export class GameScene extends Phaser.Scene {
 
   private showAnnouncement(text: string): void {
     this.announcementText.setText(text);
+    this.announcementContainer.y = this.voteContainer.visible
+      ? (this.bossBarContainer.visible ? 335 : 275)
+      : (this.bossBarContainer.visible ? 230 : 185);
     this.announcementContainer.setAlpha(1);
 
     if (this.announcementTimer) {
