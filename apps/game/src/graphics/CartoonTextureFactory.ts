@@ -107,91 +107,40 @@ export class CartoonTextureFactory {
   }
 
   // ========================================================
-  // 2. ARENA DE APOCALIPSE ZUMBI EM ESTILO CARTOON
+  // 2. ARENA MINIMALISTA GRAFITE ESCURO (LIMPA E ELEGANTE)
   // ========================================================
   private createCartoonArenaFloor(): void {
     const size = 512;
     const { canvas, ctx } = this.createCanvas(size, size);
 
-    // Asfalto escuro texturizado
-    ctx.fillStyle = '#161923';
+    // 1. Base Grafite Escuro (#11141B)
+    ctx.fillStyle = '#11141B';
     ctx.fillRect(0, 0, size, size);
 
-    // Placas de asfalto com bordas de divisão
-    ctx.strokeStyle = '#0e1118';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(4, 4, size / 2 - 8, size / 2 - 8);
-    ctx.strokeRect(size / 2 + 4, 4, size / 2 - 8, size / 2 - 8);
-    ctx.strokeRect(4, size / 2 + 4, size / 2 - 8, size / 2 - 8);
-    ctx.strokeRect(size / 2 + 4, size / 2 + 4, size / 2 - 8, size / 2 - 8);
+    // 2. Variação de Superfície Suave (#171B24 e #1C202A) em gradiente linear sutil
+    const grad1 = ctx.createLinearGradient(0, 0, size, size);
+    grad1.addColorStop(0, 'rgba(23, 27, 36, 0.65)'); // #171B24
+    grad1.addColorStop(0.5, 'rgba(17, 20, 27, 0.0)'); // #11141B
+    grad1.addColorStop(1, 'rgba(28, 32, 42, 0.55)'); // #1C202A
+    ctx.fillStyle = grad1;
+    ctx.fillRect(0, 0, size, size);
 
-    // Faixas de sinalização urbana amarela desgastadas
-    ctx.fillStyle = 'rgba(234, 179, 8, 0.45)';
-    ctx.fillRect(20, 240, 90, 24);
-    ctx.fillRect(150, 240, 90, 24);
-    ctx.fillRect(280, 240, 90, 24);
-    ctx.fillRect(410, 240, 85, 24);
+    // 3. Gradiente radial discreto para leve iluminação de profundidade
+    const radCenter = ctx.createRadialGradient(size / 2, size / 2, 40, size / 2, size / 2, size / 1.3);
+    radCenter.addColorStop(0, 'rgba(28, 32, 42, 0.40)');
+    radCenter.addColorStop(1, 'rgba(17, 20, 27, 0.0)');
+    ctx.fillStyle = radCenter;
+    ctx.fillRect(0, 0, size, size);
 
-    // Rachaduras e fissuras com brilho tóxico verde neon
-    const drawCrack = (startX: number, startY: number, points: [number, number][], toxicGlow = false) => {
-      ctx.save();
-      if (toxicGlow) {
-        ctx.strokeStyle = '#22c55e';
-        ctx.lineWidth = 5;
-        ctx.shadowColor = '#4ade80';
-        ctx.shadowBlur = 8;
-      } else {
-        ctx.strokeStyle = '#090b10';
-        ctx.lineWidth = 3;
+    // 4. Micro-textura imperceptível (sem repetições chamativas)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.015)';
+    for (let x = 12; x < size; x += 24) {
+      for (let y = 12; y < size; y += 24) {
+        if ((x + y) % 48 === 0) {
+          ctx.fillRect(x, y, 1.5, 1.5);
+        }
       }
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      for (const [px, py] of points) {
-        ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      ctx.restore();
-    };
-
-    drawCrack(80, 90, [[110, 130], [135, 140], [170, 180], [185, 220]], true);
-    drawCrack(340, 360, [[370, 380], [400, 420], [420, 470]], true);
-    drawCrack(380, 110, [[350, 130], [330, 170], [290, 190]], false);
-    drawCrack(120, 390, [[160, 410], [190, 450]], false);
-
-    // Poças de lodo radioativo verde cartoon
-    ctx.save();
-    ctx.fillStyle = 'rgba(34, 197, 94, 0.35)';
-    ctx.strokeStyle = 'rgba(74, 222, 128, 0.7)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(135, 150, 32, 18, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.ellipse(390, 410, 26, 14, -0.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    // Manchas de sangue seco e carmesim
-    ctx.fillStyle = 'rgba(153, 27, 27, 0.45)';
-    ctx.beginPath();
-    ctx.arc(280, 130, 14, 0, Math.PI * 2);
-    ctx.arc(295, 140, 8, 0, Math.PI * 2);
-    ctx.arc(270, 142, 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(200, 350, 16, 0, Math.PI * 2);
-    ctx.arc(220, 360, 10, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Cartuchos de bala caídos
-    ctx.fillStyle = '#facc15';
-    ctx.fillRect(250, 220, 6, 3);
-    ctx.fillRect(258, 224, 6, 3);
-    ctx.fillRect(264, 218, 5, 3);
+    }
 
     this.registerCanvas('arena_floor', canvas);
   }

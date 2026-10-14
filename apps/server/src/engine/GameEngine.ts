@@ -429,7 +429,7 @@ export class GameEngine extends EventEmitter {
     let hp = 100 * waveMult;
     let speed = 80;
     let damage = 10 * waveMult;
-    let radius = 18;
+    let radius = 24;
     let xpReward = 10;
     let scoreReward = 100;
 
@@ -437,14 +437,14 @@ export class GameEngine extends EventEmitter {
       hp = 50 * waveMult;
       speed = 150;
       damage = 12 * waveMult;
-      radius = 14;
+      radius = 20;
       xpReward = 15;
       scoreReward = 150;
     } else if (type === 'TANK') {
       hp = 350 * waveMult;
       speed = 45;
       damage = 25 * waveMult;
-      radius = 26;
+      radius = 36;
       xpReward = 35;
       scoreReward = 300;
     }
@@ -483,7 +483,7 @@ export class GameEngine extends EventEmitter {
       maxHp: bossHp,
       speed: 60,
       damage: 40,
-      radius: 42,
+      radius: 56,
       xpReward: 300,
       scoreReward: 2500,
       isBoss: true,

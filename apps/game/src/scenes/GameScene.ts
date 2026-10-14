@@ -33,6 +33,7 @@ export class GameScene extends Phaser.Scene {
     healthBar: Phaser.GameObjects.Graphics;
     data: EnemyData;
     lastHp: number;
+    shadowOffsetY?: number;
   }> = new Map();
   private projectileSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private companionNodes: Map<string, {
@@ -101,28 +102,30 @@ export class GameScene extends Phaser.Scene {
     // 2. Iluminação Dinâmica ao redor do Herói
     this.survivorLight = this.add.image(width / 2, height / 2, 'survivor_light')
       .setDepth(2)
+      .setScale(1.35)
       .setBlendMode(Phaser.BlendModes.ADD);
 
-    // Sombra suave do Sobrevivente
-    this.survivorShadow = this.add.image(width / 2, height / 2 + 28, 'shadow_blob')
+    // Sombra suave do Sobrevivente (proporcional ao novo tamanho maior)
+    this.survivorShadow = this.add.image(width / 2, height / 2 + 36, 'shadow_blob')
       .setDepth(3)
-      .setScale(0.85);
+      .setScale(1.30);
 
-    // Bordas de segurança da arena cartoon
+    // Bordas de arena minimalistas elegantes e discretas
     const borders = this.add.graphics().setDepth(5);
-    borders.lineStyle(10, 0x050505, 1);
+    borders.lineStyle(8, 0x0a0c12, 1);
     borders.strokeRect(8, 8, width - 16, height - 16);
-    borders.lineStyle(4, 0xef4444, 0.7);
-    borders.strokeRect(18, 18, width - 36, height - 36);
+    borders.lineStyle(2, 0x1e2433, 0.8);
+    borders.strokeRect(14, 14, width - 28, height - 28);
 
-    // 3. Sobrevivente Principal
+    // 3. Sobrevivente Principal (+55% maior)
     this.survivorShieldSprite = this.add.sprite(width / 2, height / 2, 'shield_bubble');
     this.survivorShieldSprite.setVisible(false);
     this.survivorShieldSprite.setDepth(15);
+    this.survivorShieldSprite.setScale(1.40);
 
     this.survivorSprite = this.add.sprite(width / 2, height / 2, 'survivor_idle')
       .setDepth(10)
-      .setScale(0.72);
+      .setScale(1.12);
     this.survivorSprite.play('survivor_walk_anim');
 
     this.survivorHealthBar = this.add.graphics();
@@ -380,7 +383,7 @@ export class GameScene extends Phaser.Scene {
 
     // 1. Atualizar Sobrevivente Principal
     this.survivorSprite.setPosition(snap.survivor.x, snap.survivor.y);
-    this.survivorShadow.setPosition(snap.survivor.x, snap.survivor.y + 24);
+    this.survivorShadow.setPosition(snap.survivor.x, snap.survivor.y + 36);
     this.survivorLight.setPosition(snap.survivor.x, snap.survivor.y);
     this.survivorShieldSprite.setPosition(snap.survivor.x, snap.survivor.y);
     this.survivorShieldSprite.setVisible(snap.survivor.shieldActive);
@@ -406,13 +409,13 @@ export class GameScene extends Phaser.Scene {
     }
     this.lastProjectileCount = snap.projectiles.length;
 
-    // Mini barra de vida sobre o sobrevivente
+    // Mini barra de vida sobre o sobrevivente (proporcional ao herói maior)
     this.survivorHealthBar.clear();
     const hpRatio = Math.max(0, snap.survivor.hp / snap.survivor.maxHp);
     this.survivorHealthBar.fillStyle(0x050505, 0.7);
-    this.survivorHealthBar.fillRect(snap.survivor.x - 26, snap.survivor.y - 38, 52, 7);
+    this.survivorHealthBar.fillRect(snap.survivor.x - 38, snap.survivor.y - 58, 76, 9);
     this.survivorHealthBar.fillStyle(hpRatio > 0.3 ? 0x22c55e : 0xef4444, 1);
-    this.survivorHealthBar.fillRect(snap.survivor.x - 26, snap.survivor.y - 38, 52 * hpRatio, 7);
+    this.survivorHealthBar.fillRect(snap.survivor.x - 38, snap.survivor.y - 58, 76 * hpRatio, 9);
 
     // 2. Atualizar Inimigos Zumbis
     const activeEnemyIds = new Set<string>();
@@ -424,27 +427,31 @@ export class GameScene extends Phaser.Scene {
       if (!enemyObj) {
         let texture = 'zombie_common';
         let animKey = 'zombie_common_walk_anim';
-        let scale = 0.60;
-        let shadowScale = 0.70;
+        let scale = 0.92; // +53% maior
+        let shadowScale = 1.10;
+        let shadowOffsetY = 36;
 
         if (enemyData.type === 'RUNNER') {
           texture = 'zombie_runner';
           animKey = 'zombie_runner_walk_anim';
-          scale = 0.55;
-          shadowScale = 0.65;
+          scale = 0.85; // +55% maior
+          shadowScale = 1.00;
+          shadowOffsetY = 34;
         } else if (enemyData.type === 'TANK') {
           texture = 'zombie_tank';
           animKey = 'zombie_tank_walk_anim';
-          scale = 0.72;
-          shadowScale = 1.15;
+          scale = 1.12; // +55% maior
+          shadowScale = 1.75;
+          shadowOffsetY = 52;
         } else if (enemyData.type === 'BOSS') {
           texture = 'zombie_boss';
           animKey = 'zombie_boss_walk_anim';
-          scale = 0.82;
-          shadowScale = 2.10;
+          scale = 1.24; // +51% maior
+          shadowScale = 3.00;
+          shadowOffsetY = 90;
         }
 
-        const shadow = this.add.image(enemyData.x, enemyData.y + 24, 'shadow_blob')
+        const shadow = this.add.image(enemyData.x, enemyData.y + shadowOffsetY, 'shadow_blob')
           .setDepth(enemyData.isBoss ? 7 : 6)
           .setScale(shadowScale);
 
@@ -454,14 +461,14 @@ export class GameScene extends Phaser.Scene {
         sprite.play(animKey);
 
         const healthBar = this.add.graphics().setDepth(enemyData.isBoss ? 10 : 9);
-        enemyObj = { sprite, shadow, healthBar, data: enemyData, lastHp: enemyData.hp };
+        enemyObj = { sprite, shadow, healthBar, data: enemyData, lastHp: enemyData.hp, shadowOffsetY };
         this.enemySprites.set(enemyData.id, enemyObj);
       }
 
       // Interpolação suave de posição
       enemyObj.sprite.x += (enemyData.x - enemyObj.sprite.x) * 0.42;
       enemyObj.sprite.y += (enemyData.y - enemyObj.sprite.y) * 0.42;
-      enemyObj.shadow.setPosition(enemyObj.sprite.x, enemyObj.sprite.y + (enemyData.isBoss ? 55 : 24));
+      enemyObj.shadow.setPosition(enemyObj.sprite.x, enemyObj.sprite.y + (enemyObj.shadowOffsetY || 36));
 
       // Rotação do zumbi olhando para o herói
       const angle = Phaser.Math.Angle.Between(enemyObj.sprite.x, enemyObj.sprite.y, snap.survivor.x, snap.survivor.y);
@@ -476,12 +483,26 @@ export class GameScene extends Phaser.Scene {
         enemyObj.lastHp = enemyData.hp;
       }
 
-      // Mini barra de vida sobre o zumbi
+      // Mini barra de vida sobre o zumbi (proporcional aos tamanhos maiores)
       enemyObj.healthBar.clear();
       const zHpRatio = Math.max(0, enemyData.hp / enemyData.maxHp);
-      const barWidth = enemyData.isBoss ? 88 : 34;
-      const barHeight = enemyData.isBoss ? 8 : 5;
-      const offsetY = enemyData.isBoss ? 64 : 28;
+      let barWidth = 54;
+      let barHeight = 7;
+      let offsetY = 48;
+
+      if (enemyData.type === 'RUNNER') {
+        barWidth = 50;
+        barHeight = 7;
+        offsetY = 44;
+      } else if (enemyData.type === 'TANK') {
+        barWidth = 84;
+        barHeight = 9;
+        offsetY = 70;
+      } else if (enemyData.isBoss) {
+        barWidth = 135;
+        barHeight = 11;
+        offsetY = 110;
+      }
 
       enemyObj.healthBar.fillStyle(0x050505, 0.7);
       enemyObj.healthBar.fillRect(enemyObj.sprite.x - barWidth / 2, enemyObj.sprite.y - offsetY, barWidth, barHeight);
@@ -516,11 +537,11 @@ export class GameScene extends Phaser.Scene {
     for (const [id, pSprite] of this.projectileSprites.entries()) {
       if (!activeProjIds.has(id)) {
         // Faísca de impacto cartoon
-        const spark = this.add.image(pSprite.x, pSprite.y, 'fx_hit_spark').setDepth(15).setScale(0.7);
+        const spark = this.add.image(pSprite.x, pSprite.y, 'fx_hit_spark').setDepth(15).setScale(0.85);
         this.tweens.add({
           targets: spark,
           alpha: 0,
-          scale: 1.2,
+          scale: 1.3,
           duration: 120,
           onComplete: () => spark.destroy()
         });
@@ -537,15 +558,15 @@ export class GameScene extends Phaser.Scene {
 
       if (!cObj) {
         const container = this.add.container(petData.x, petData.y).setDepth(14);
-        const petSprite = this.add.sprite(0, 0, 'companion_pet').setScale(0.65);
+        const petSprite = this.add.sprite(0, 0, 'companion_pet').setScale(0.95);
 
         // Badge estilizada com o nome do espectador e ícone de estrela
-        const nameTag = this.add.text(0, -28, `⭐ @${petData.username}`, {
+        const nameTag = this.add.text(0, -38, `⭐ @${petData.username}`, {
           fontFamily: 'Segoe UI, sans-serif',
-          fontSize: '13px',
+          fontSize: '14px',
           color: '#fef08a',
           backgroundColor: 'rgba(15, 23, 42, 0.85)',
-          padding: { x: 6, y: 2 }
+          padding: { x: 7, y: 3 }
         }).setOrigin(0.5);
 
         // Suporte a avatar de perfil do TikTok
@@ -871,12 +892,12 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < puffCount; i++) {
       const p = this.add.graphics().setDepth(20);
       p.fillStyle(color, 0.9);
-      p.fillCircle(x, y, isBoss ? 16 : 9);
-      p.lineStyle(2, 0x050505, 1);
-      p.strokeCircle(x, y, isBoss ? 16 : 9);
+      p.fillCircle(x, y, isBoss ? 24 : 14);
+      p.lineStyle(2.5, 0x050505, 1);
+      p.strokeCircle(x, y, isBoss ? 24 : 14);
 
       const a = (i * (Math.PI * 2)) / puffCount;
-      const dist = isBoss ? 80 : 35;
+      const dist = isBoss ? 110 : 50;
       const targetX = x + Math.cos(a) * dist;
       const targetY = y + Math.sin(a) * dist;
 
