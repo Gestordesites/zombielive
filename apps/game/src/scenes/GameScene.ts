@@ -5,13 +5,16 @@ import {
   ProjectileData,
   VisualEffectEvent,
   GameAnnouncement,
-  VoteSession
+  VoteSession,
+  SOCKET_EVENTS
 } from '@zombie-live/shared';
 import { GameSocketClient } from '../network/socketClient.js';
+import { soundManager } from '../audio/SoundManager.js';
 
 export class GameScene extends Phaser.Scene {
   private socketClient!: GameSocketClient;
   private currentSnapshot: GameStateSnapshot | null = null;
+  private lastProjectileCount: number = 0;
 
   // Sprites
   private floorTile!: Phaser.GameObjects.TileSprite;
@@ -65,6 +68,9 @@ export class GameScene extends Phaser.Scene {
     const width = 1080;
     const height = 1920;
 
+    // Desbloqueia contexto de áudio em clique ou toque
+    this.input.on('pointerdown', () => soundManager.resumeAudio());
+
     // 1. Chão da Arena (Vertical 9:16)
     this.floorTile = this.add.tileSprite(width / 2, height / 2, width, height, 'arena_floor');
 
@@ -109,6 +115,32 @@ export class GameScene extends Phaser.Scene {
 
     this.socketClient.onAnnouncement(ann => {
       this.showAnnouncement(ann.message);
+      if (ann.type === 'GIFT') {
+        soundManager.playGiftAlert();
+      }
+    });
+
+    // 5. Conectar Efeitos Sonoros do Jogo e da Live
+    this.socketClient.on(SOCKET_EVENTS.FOLLOWER_ANNOUNCEMENT, () => soundManager.playFollowerAlert());
+    this.socketClient.on(SOCKET_EVENTS.COLLECTIVE_GOAL_ACHIEVED, () => soundManager.playGoalAchieved());
+    this.socketClient.on(SOCKET_EVENTS.BOSS_SPAWNED, () => soundManager.playBossSpawn());
+    this.socketClient.on(SOCKET_EVENTS.BOSS_DEFEATED, () => soundManager.playBossDefeated());
+    this.socketClient.on(SOCKET_EVENTS.LEVEL_UP, () => soundManager.playLevelUp());
+    this.socketClient.on(SOCKET_EVENTS.PLAYER_DAMAGED, () => soundManager.playPlayerHurt());
+    this.socketClient.on(SOCKET_EVENTS.ENEMY_DEFEATED, () => soundManager.playZombieDefeated());
+    this.socketClient.on(SOCKET_EVENTS.MATCH_FINISHED, (payload: any) => {
+      if (payload.result === 'GAME_OVER') soundManager.playGameOver();
+      else if (payload.result === 'VICTORY') soundManager.playVictory();
+    });
+    this.socketClient.on(SOCKET_EVENTS.ABILITY_ACTIVATED, (payload: any) => {
+      switch (payload.skill) {
+        case 'CURA': soundManager.playHeal(); break;
+        case 'ESCUDO': soundManager.playShield(); break;
+        case 'ATAQUE': soundManager.playSlash(); break;
+        case 'FOGO': soundManager.playFire(); break;
+        case 'CONGELAMENTO': soundManager.playIce(); break;
+        case 'EXPLOSAO': soundManager.playExplosion(); break;
+      }
     });
   }
 
@@ -374,6 +406,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 3. Atualizar Projéteis
+    if (snap.projectiles.length > this.lastProjectileCount) {
+      soundManager.playShoot();
+    }
+    this.lastProjectileCount = snap.projectiles.length;
+
     const activeProjIds = new Set<string>();
     for (const projData of snap.projectiles) {
       activeProjIds.add(projData.id);

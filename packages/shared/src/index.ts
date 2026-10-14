@@ -256,6 +256,8 @@ export interface GameSettings {
   soundEnabled: boolean;
   reducedVfx: boolean;
   welcomeFollowerText: string;
+  autoStartMatches: boolean;
+  autoRestartSeconds: number;
 }
 
 // 15. Contrato de Eventos Socket.IO

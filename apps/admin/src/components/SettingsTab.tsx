@@ -190,6 +190,36 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             />
           </div>
 
+          <div className="form-group">
+            <label className="form-label">Iniciar Partidas Automaticamente (Loop Contínuo 24/7)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+              <input
+                type="checkbox"
+                id="autoStartCheck"
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                checked={formData.autoStartMatches ?? true}
+                onChange={e => setFormData({ ...formData, autoStartMatches: e.target.checked })}
+              />
+              <label htmlFor="autoStartCheck" style={{ fontSize: '13px', cursor: 'pointer', color: 'var(--text-main)' }}>
+                {formData.autoStartMatches ? '✅ Ativado (Inicia e reinicia partidas sozinho)' : '❌ Desativado (Aguardar início manual)'}
+              </label>
+            </div>
+            <small style={{ color: 'var(--text-muted)' }}>Mantém a live transmitindo continuamente sem intervenção manual.</small>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Tempo de Espera para Reinício Automático (segundos)</label>
+            <input
+              type="number"
+              min={3}
+              max={60}
+              className="form-input"
+              value={formData.autoRestartSeconds ?? 7}
+              onChange={e => setFormData({ ...formData, autoRestartSeconds: Number(e.target.value) })}
+            />
+            <small style={{ color: 'var(--text-muted)' }}>Pausa na tela de vitória/derrota antes de reiniciar nova partida.</small>
+          </div>
+
           <div style={{ gridColumn: '1 / -1' }}>
             <button type="submit" className="btn btn-primary">
               <Save size={16} /> Salvar Todas as Configurações

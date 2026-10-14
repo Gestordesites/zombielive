@@ -56,6 +56,10 @@ export class GameSocketClient {
     });
   }
 
+  on(event: string, callback: (...args: any[]) => void): void {
+    this.socket.on(event, callback);
+  }
+
   onSnapshot(cb: (snapshot: GameStateSnapshot) => void) { this.onSnapshotCallback = cb; }
   onVisualEffect(cb: (effect: VisualEffectEvent) => void) { this.onVisualEffectCallback = cb; }
   onAnnouncement(cb: (announcement: GameAnnouncement) => void) { this.onAnnouncementCallback = cb; }

@@ -10,11 +10,12 @@ describe('GameEngine & Core Mechanics', () => {
 
   beforeEach(() => {
     engine = new GameEngine({
-      arenaWidth: 1280,
-      arenaHeight: 720,
+      arenaWidth: 1080,
+      arenaHeight: 1920,
       waveDurationSeconds: 10,
       bossWaveInterval: 2,
-      maxEnemiesAlive: 20
+      maxEnemiesAlive: 20,
+      autoStartMatches: false
     });
   });
 
@@ -75,7 +76,19 @@ describe('GameEngine & Core Mechanics', () => {
     const snap = engine.getSnapshot();
     assert.strictEqual(snap.totalLikesReceived, 150);
     assert.strictEqual(snap.collectiveGoal.current, 150);
-    assert.strictEqual(snap.collectiveGoal.progressPercent, 30); // 150 / 500 = 30%
+    assert.strictEqual(snap.collectiveGoal.progressPercent, 30);
+  });
+
+  it('deve agendar reinício automático após GAME_OVER quando autoStartMatches estiver ativo', (_t, done) => {
+    engine.updateSettings({ autoStartMatches: true, autoRestartSeconds: 1 });
+    (engine as any).status = 'PLAYING';
+    engine.stopMatch('GAME_OVER');
+    assert.strictEqual(engine.getSnapshot().status, 'GAME_OVER');
+    setTimeout(() => {
+      assert.strictEqual(engine.getSnapshot().status, 'COUNTDOWN');
+      engine.stopMatch('ABORTED');
+      done();
+    }, 1200);
   });
 });
 

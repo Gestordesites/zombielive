@@ -33,7 +33,9 @@ export const defaultSettings: GameSettings = {
   collectiveGoalLikesTarget: 500,
   soundEnabled: true,
   reducedVfx: false,
-  welcomeFollowerText: 'NOVO SOBREVIVENTE!'
+  welcomeFollowerText: 'NOVO SOBREVIVENTE!',
+  autoStartMatches: true,
+  autoRestartSeconds: 7
 };
 
 /**

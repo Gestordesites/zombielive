@@ -46,6 +46,7 @@ export class GameEngine extends EventEmitter {
   private enemySpawnTimer: number = 0;
   private bossSpecialTimer: number = 0;
   private countdownTimer: number = 0;
+  private autoRestartTimeout: NodeJS.Timeout | null = null;
 
   constructor(settings?: Partial<GameSettings>) {
     super();
@@ -53,6 +54,15 @@ export class GameEngine extends EventEmitter {
       this.settings = { ...this.settings, ...settings };
     }
     this.resetState();
+
+    // Início automático da primeira partida se configurado
+    if (this.settings.autoStartMatches) {
+      setTimeout(() => {
+        if (this.status === 'IDLE') {
+          this.startMatch();
+        }
+      }, 1500);
+    }
   }
 
   getSettings(): GameSettings {
@@ -197,6 +207,11 @@ export class GameEngine extends EventEmitter {
   // ==========================================
 
   startMatch(): void {
+    if (this.autoRestartTimeout) {
+      clearTimeout(this.autoRestartTimeout);
+      this.autoRestartTimeout = null;
+    }
+
     if (this.status !== 'IDLE' && this.status !== 'GAME_OVER' && this.status !== 'VICTORY') {
       return;
     }
@@ -243,6 +258,11 @@ export class GameEngine extends EventEmitter {
   }
 
   stopMatch(result: 'VICTORY' | 'GAME_OVER' | 'ABORTED' = 'ABORTED'): void {
+    if (this.autoRestartTimeout) {
+      clearTimeout(this.autoRestartTimeout);
+      this.autoRestartTimeout = null;
+    }
+
     this.status = result === 'VICTORY' ? 'VICTORY' : result === 'GAME_OVER' ? 'GAME_OVER' : 'IDLE';
     this.stopLoop();
     this.addAnnouncement('SYSTEM', `Partida finalizada. Resultado: ${result}`);
@@ -254,9 +274,24 @@ export class GameEngine extends EventEmitter {
       duration: this.matchDurationSeconds
     });
     this.emitStateUpdated();
+
+    // Auto-Restart automático para live contínua 24/7
+    if (this.settings.autoStartMatches && (result === 'GAME_OVER' || result === 'VICTORY')) {
+      const waitSecs = this.settings.autoRestartSeconds || 7;
+      this.addAnnouncement('SYSTEM', `Próxima partida iniciando automaticamente em ${waitSecs} segundos...`);
+      this.autoRestartTimeout = setTimeout(() => {
+        if (this.status === 'GAME_OVER' || this.status === 'VICTORY' || this.status === 'IDLE') {
+          this.startMatch();
+        }
+      }, waitSecs * 1000);
+    }
   }
 
   restartMatch(): void {
+    if (this.autoRestartTimeout) {
+      clearTimeout(this.autoRestartTimeout);
+      this.autoRestartTimeout = null;
+    }
     this.stopLoop();
     this.startMatch();
   }
