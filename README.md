@@ -110,7 +110,7 @@ npm run dev:admin
 | Aplicação | URL Local | Finalidade | Credenciais Padrão |
 | :--- | :--- | :--- | :--- |
 | **Jogo Público / OBS** | `http://localhost:3000` ou `http://localhost:4000/live` | Captura para live | Acesso livre |
-| **Painel de Controle** | `http://localhost:3001` ou `http://localhost:4000/admin` | Gestão e simulação | `admin` / `admin123456` |
+| **Painel de Controle** | `http://localhost:3001` ou `http://localhost:4000/admin` | Gestão e simulação | `admin` / `` |
 | **API Backend** | `http://localhost:4000` | REST API e WebSockets | — |
 
 ---
