@@ -3,6 +3,7 @@ import {
   GameStateSnapshot,
   EnemyData,
   ProjectileData,
+  CompanionPetData,
   VisualEffectEvent,
   GameAnnouncement,
   VoteSession,
@@ -23,6 +24,13 @@ export class GameScene extends Phaser.Scene {
   private survivorShieldSprite!: Phaser.GameObjects.Sprite;
   private enemySprites: Map<string, { sprite: Phaser.GameObjects.Sprite; healthBar: Phaser.GameObjects.Graphics; data: EnemyData }> = new Map();
   private projectileSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private companionNodes: Map<string, {
+    container: Phaser.GameObjects.Container;
+    petSprite: Phaser.GameObjects.Sprite;
+    nameTag: Phaser.GameObjects.Text;
+    avatarImg?: Phaser.GameObjects.Image;
+    data: CompanionPetData;
+  }> = new Map();
 
   // Elementos do HUD
   private hudContainer!: Phaser.GameObjects.Container;
@@ -69,7 +77,12 @@ export class GameScene extends Phaser.Scene {
     const height = 1920;
 
     // Desbloqueia contexto de áudio em clique ou toque
-    this.input.on('pointerdown', () => soundManager.resumeAudio());
+    this.input.on('pointerdown', () => {
+      soundManager.resumeAudio();
+      if (!soundManager.isBgmActive()) {
+        soundManager.startBgm();
+      }
+    });
 
     // 1. Chão da Arena (Vertical 9:16)
     this.floorTile = this.add.tileSprite(width / 2, height / 2, width, height, 'arena_floor');
@@ -107,6 +120,9 @@ export class GameScene extends Phaser.Scene {
     this.socketClient.onSnapshot(snap => {
       this.currentSnapshot = snap;
       this.updateHudWithSnapshot(snap);
+      if (!soundManager.isBgmActive()) {
+        soundManager.startBgm();
+      }
     });
 
     this.socketClient.onVisualEffect(effect => {
@@ -416,7 +432,8 @@ export class GameScene extends Phaser.Scene {
       activeProjIds.add(projData.id);
       let pSprite = this.projectileSprites.get(projData.id);
       if (!pSprite) {
-        pSprite = this.add.sprite(projData.x, projData.y, 'projectile').setDepth(12);
+        const texture = projData.id.startsWith('proj_pet_') ? 'projectile_pet' : 'projectile';
+        pSprite = this.add.sprite(projData.x, projData.y, texture).setDepth(12);
         this.projectileSprites.set(projData.id, pSprite);
       }
       pSprite.setPosition(projData.x, projData.y);
@@ -426,6 +443,71 @@ export class GameScene extends Phaser.Scene {
       if (!activeProjIds.has(id)) {
         pSprite.destroy();
         this.projectileSprites.delete(id);
+      }
+    }
+
+    // 4. Atualizar Bichinhos Aliados dos Doadores de Presentes (Pets de Batalha)
+    const activeCompanionIds = new Set<string>();
+    for (const petData of (snap.companions || [])) {
+      activeCompanionIds.add(petData.id);
+      let cObj = this.companionNodes.get(petData.id);
+
+      if (!cObj) {
+        const container = this.add.container(petData.x, petData.y).setDepth(14);
+        const petSprite = this.add.sprite(0, 0, 'companion_pet');
+
+        // Badge estilizada com o nome do espectador e ícone de estrela
+        const nameTag = this.add.text(0, -28, `⭐ @${petData.username}`, {
+          fontFamily: 'Segoe UI, sans-serif',
+          fontSize: '13px',
+          color: '#fef08a',
+          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+          padding: { x: 6, y: 2 }
+        }).setOrigin(0.5);
+
+        // Suporte a avatar de perfil do TikTok (se presente na live)
+        let avatarImg: Phaser.GameObjects.Image | undefined;
+        if (petData.avatarUrl) {
+          const key = `avatar_${petData.userId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+          if (!this.textures.exists(key)) {
+            this.load.image(key, petData.avatarUrl);
+            this.load.once(`filecomplete-image-${key}`, () => {
+              if (container.active) {
+                const img = this.add.image(0, 0, key).setDisplaySize(24, 24);
+                const maskShape = this.make.graphics({ x: 0, y: 0 });
+                maskShape.fillCircle(container.x, container.y, 12);
+                img.setMask(maskShape.createGeometryMask());
+                container.add(img);
+              }
+            });
+            this.load.start();
+          } else {
+            avatarImg = this.add.image(0, 0, key).setDisplaySize(24, 24);
+            const maskShape = this.make.graphics({ x: 0, y: 0 });
+            maskShape.fillCircle(container.x, container.y, 12);
+            avatarImg.setMask(maskShape.createGeometryMask());
+          }
+        }
+
+        container.add(petSprite);
+        if (avatarImg) container.add(avatarImg);
+        container.add(nameTag);
+
+        cObj = { container, petSprite, nameTag, avatarImg, data: petData };
+        this.companionNodes.set(petData.id, cObj);
+      }
+
+      // Movimento orbital suave + flutuação kawaii (bobbing)
+      const bobbing = Math.sin((this.time.now / 180) + petData.orbitAngle) * 3;
+      cObj.container.x += (petData.x - cObj.container.x) * 0.45;
+      cObj.container.y += (petData.y + bobbing - cObj.container.y) * 0.45;
+    }
+
+    for (const [id, cObj] of this.companionNodes.entries()) {
+      if (!activeCompanionIds.has(id)) {
+        this.createDeathPuff(cObj.container.x, cObj.container.y);
+        cObj.container.destroy();
+        this.companionNodes.delete(id);
       }
     }
 

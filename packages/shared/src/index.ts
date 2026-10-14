@@ -154,7 +154,25 @@ export interface WaveState {
   bossMaxHp: number;
 }
 
-// 10. Estado Completo do Jogo
+// 10. Bichinhos Aliados dos Doadores de Presentes (Pets de Batalha)
+export interface CompanionPetData {
+  id: string;
+  userId: string;
+  username: string;
+  avatarUrl?: string;
+  giftName: string;
+  x: number;
+  y: number;
+  targetEnemyId: string | null;
+  damage: number;
+  attackCooldownMs: number;
+  lastAttackTimestamp: number;
+  orbitAngle: number;
+  orbitDistance: number;
+  expiresAt: number;
+}
+
+// 11. Estado Completo do Jogo
 export interface GameStateSnapshot {
   status: MatchStatus;
   matchId: string;
@@ -164,6 +182,7 @@ export interface GameStateSnapshot {
   survivor: SurvivorData;
   enemies: EnemyData[];
   projectiles: ProjectileData[];
+  companions: CompanionPetData[];
   wave: WaveState;
   collectiveGoal: CollectiveGoal;
   activeVote: VoteSession | null;

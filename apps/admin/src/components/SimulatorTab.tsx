@@ -56,10 +56,10 @@ export const SimulatorTab: React.FC = () => {
     try {
       await api.simulateEvent({
         type: 'GIFT',
-        user: { id: 'sim_gift_user', username: customUser },
+        user: { id: 'sim_user_' + customUser.toLowerCase().replace(/[^a-z0-9]/g, ''), username: customUser },
         data: { giftId: '1001', giftName, giftCount: count }
       });
-      notify(`Presente simulado: ${giftName} x${count} por @${customUser}!`);
+      notify(`Presente: ${giftName} por @${customUser}! Pet guardião invocado na arena!`);
     } catch (err: any) {
       alert(err.message);
     }
@@ -161,9 +161,12 @@ export const SimulatorTab: React.FC = () => {
         </div>
 
         <div className="card">
-          <h3 style={{ fontSize: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Gift size={18} color="var(--accent-purple)" /> Presentes Virtuais
+          <h3 style={{ fontSize: '16px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Gift size={18} color="var(--accent-purple)" /> Presentes Virtuais (Invoca Bichinho Guardião)
           </h3>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+            Cada presente invoca um pet de batalha aliado com o nome do doador que orbita o herói e ataca os zumbis!
+          </p>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button className="btn btn-secondary" onClick={() => simulateGift('Rosa')}>
               🌹 Rosa

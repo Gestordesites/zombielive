@@ -535,6 +535,117 @@ export class SoundManager {
       osc.stop(startTime + 0.65);
     });
   }
+
+  // ==========================================
+  // MÚSICA DE FUNDO PROCEDURAL (AMBIENT SYNTH BGM)
+  // ==========================================
+
+  private bgmGain: GainNode | null = null;
+  private bgmFilter: BiquadFilterNode | null = null;
+  private bgmInterval: any = null;
+  private bgmStep: number = 0;
+  private bgmRunning: boolean = false;
+  private bgmVolume: number = 0.12; // Baixinho e envolvente
+
+  public startBgm(): void {
+    if (this.bgmRunning || !this.ctx) return;
+    this.resumeAudio();
+
+    if (!this.bgmGain) {
+      this.bgmGain = this.ctx.createGain();
+      this.bgmFilter = this.ctx.createBiquadFilter();
+      this.bgmFilter.type = 'lowpass';
+      this.bgmFilter.frequency.setValueAtTime(650, this.ctx.currentTime); // Som aveludado e suave
+
+      this.bgmGain.gain.setValueAtTime(this.bgmVolume, this.ctx.currentTime);
+      this.bgmGain.connect(this.bgmFilter);
+      this.bgmFilter.connect(this.masterGain!);
+    }
+
+    this.bgmRunning = true;
+    this.bgmStep = 0;
+
+    // Compassos hipnóticos de sobrevivência (D minor darkwave / synth ambient)
+    // 16 passos de 240ms (~125 BPM)
+    const bassline = [
+      73.42, 0, 73.42, 0,      // D2
+      87.31, 0, 87.31, 0,      // F2
+      65.41, 0, 65.41, 0,      // C2
+      55.00, 0, 58.27, 65.41   // A1, Bb1, C2
+    ];
+
+    const melody = [
+      293.66, 0, 349.23, 0,    // D4, F4
+      440.00, 0, 392.00, 0,    // A4, G4
+      329.63, 0, 293.66, 0,    // E4, D4
+      261.63, 293.66, 349.23, 0 // C4, D4, F4
+    ];
+
+    const stepDuration = 0.24;
+
+    this.bgmInterval = setInterval(() => {
+      if (!this.ctx || !this.bgmRunning || this.isMuted) return;
+      const now = this.ctx.currentTime;
+      const stepIdx = this.bgmStep % 16;
+      this.bgmStep++;
+
+      const bassFreq = bassline[stepIdx];
+      const melFreq = melody[stepIdx];
+
+      // Nota de Baixo pulsante
+      if (bassFreq > 0) {
+        const bassOsc = this.ctx.createOscillator();
+        const bGain = this.ctx.createGain();
+        bassOsc.type = 'sawtooth';
+        bassOsc.frequency.setValueAtTime(bassFreq, now);
+
+        bGain.gain.setValueAtTime(0.22, now);
+        bGain.gain.exponentialRampToValueAtTime(0.001, now + stepDuration * 1.5);
+
+        bassOsc.connect(bGain);
+        bGain.connect(this.bgmGain!);
+
+        bassOsc.start(now);
+        bassOsc.stop(now + stepDuration * 1.6);
+      }
+
+      // Nota Melódica sutil (pad aveludado)
+      if (melFreq > 0 && Math.random() > 0.15) {
+        const melOsc = this.ctx.createOscillator();
+        const mGain = this.ctx.createGain();
+        melOsc.type = 'sine';
+        melOsc.frequency.setValueAtTime(melFreq, now);
+
+        mGain.gain.setValueAtTime(0.12, now);
+        mGain.gain.exponentialRampToValueAtTime(0.001, now + stepDuration * 2.2);
+
+        melOsc.connect(mGain);
+        mGain.connect(this.bgmGain!);
+
+        melOsc.start(now);
+        melOsc.stop(now + stepDuration * 2.3);
+      }
+    }, stepDuration * 1000);
+  }
+
+  public stopBgm(): void {
+    this.bgmRunning = false;
+    if (this.bgmInterval) {
+      clearInterval(this.bgmInterval);
+      this.bgmInterval = null;
+    }
+  }
+
+  public setBgmVolume(vol: number): void {
+    this.bgmVolume = Math.max(0, Math.min(1, vol));
+    if (this.bgmGain && this.ctx) {
+      this.bgmGain.gain.setValueAtTime(this.bgmVolume, this.ctx.currentTime);
+    }
+  }
+
+  public isBgmActive(): boolean {
+    return this.bgmRunning;
+  }
 }
 
 export const soundManager = new SoundManager();

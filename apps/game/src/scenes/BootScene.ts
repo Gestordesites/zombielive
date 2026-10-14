@@ -157,5 +157,45 @@ export class BootScene extends Phaser.Scene {
     shieldG.fillCircle(36, 36, 33);
     shieldG.generateTexture('shield_bubble', 72, 72);
     shieldG.destroy();
+
+    // 11. Bichinho Aliado / Pet Guardião dos Espectadores (Cyber-Pet Kawaii Voador)
+    const petG = this.make.graphics({ x: 0, y: 0 });
+    // Sombra
+    petG.fillStyle(0x000000, 0.3);
+    petG.fillEllipse(20, 36, 26, 8);
+    // Asinhas de energia translúcidas
+    petG.fillStyle(0x38bdf8, 0.8);
+    petG.fillTriangle(6, 12, 14, 20, 4, 24);
+    petG.fillTriangle(34, 12, 26, 20, 36, 24);
+    // Corpinho flutuante dourado/fofo
+    petG.fillStyle(0xf59e0b, 1);
+    petG.fillCircle(20, 20, 13);
+    petG.fillStyle(0xfde68a, 1);
+    petG.fillCircle(20, 21, 9);
+    // Orelhinhas / Antenas fofas
+    petG.fillStyle(0xd97706, 1);
+    petG.fillTriangle(13, 8, 10, 15, 17, 13);
+    petG.fillTriangle(27, 8, 30, 15, 23, 13);
+    // Olhinhos expressivos
+    petG.fillStyle(0x0f172a, 1);
+    petG.fillCircle(16, 19, 2.5);
+    petG.fillCircle(24, 19, 2.5);
+    petG.fillStyle(0xffffff, 1);
+    petG.fillCircle(17, 18, 1);
+    petG.fillCircle(25, 18, 1);
+    // Auréola flutuante de guardião
+    petG.lineStyle(2, 0xfffbeb, 0.9);
+    petG.strokeEllipse(20, 6, 18, 5);
+    petG.generateTexture('companion_pet', 40, 40);
+    petG.destroy();
+
+    // 12. Projétil Estelar do Bichinho Aliado
+    const starG = this.make.graphics({ x: 0, y: 0 });
+    starG.fillStyle(0xfbbf24, 1);
+    starG.fillCircle(8, 8, 7);
+    starG.fillStyle(0xffffff, 1);
+    starG.fillCircle(8, 8, 3.5);
+    starG.generateTexture('projectile_pet', 16, 16);
+    starG.destroy();
   }
 }

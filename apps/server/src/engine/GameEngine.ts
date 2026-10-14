@@ -15,6 +15,7 @@ import {
   GameAnnouncement,
   GameSettings,
   NormalizedLiveEvent,
+  CompanionPetData,
   SOCKET_EVENTS
 } from '@zombie-live/shared';
 import { EventEmitter } from 'events';
@@ -36,6 +37,7 @@ export class GameEngine extends EventEmitter {
   private survivor!: SurvivorData;
   private enemies: Map<string, EnemyData> = new Map();
   private projectiles: ProjectileData[] = [];
+  private companions: Map<string, CompanionPetData> = new Map();
   private activeVote: VoteSession | null = null;
   private collectiveGoal!: CollectiveGoal;
   private waveState!: WaveState;
@@ -91,6 +93,7 @@ export class GameEngine extends EventEmitter {
     this.totalGiftsReceived = 0;
     this.matchDurationSeconds = 0;
     this.projectiles = [];
+    this.companions.clear();
     this.enemies.clear();
     this.announcements = [];
     this.activeVote = null;
@@ -332,13 +335,16 @@ export class GameEngine extends EventEmitter {
     // 3. Atualizar Inimigos (IA de perseguição e ataques)
     this.updateEnemies(dt, now);
 
-    // 4. Atualizar Projéteis
+    // 4. Atualizar Bichinhos Aliados dos Doadores de Presentes
+    this.updateCompanions(dt, now);
+
+    // 5. Atualizar Projéteis
     this.updateProjectiles(dt);
 
-    // 5. Atualizar Votação Ativa (se houver)
+    // 6. Atualizar Votação Ativa (se houver)
     this.updateVoteSession(dt);
 
-    // 6. Atualizar Escudo
+    // 7. Atualizar Escudo
     if (this.survivor.shieldActive && now > this.survivor.shieldExpiresAt) {
       this.survivor.shieldActive = false;
     }
@@ -729,6 +735,109 @@ export class GameEngine extends EventEmitter {
   }
 
   // ==========================================
+  // BICHINHOS ALIADOS (DOADORES DE PRESENTES)
+  // ==========================================
+
+  private updateCompanions(dt: number, now: number): void {
+    const expired: string[] = [];
+
+    for (const pet of this.companions.values()) {
+      if (pet.expiresAt && now > pet.expiresAt) {
+        expired.push(pet.id);
+        continue;
+      }
+
+      // Orbita ao redor do sobrevivente
+      pet.orbitAngle = (pet.orbitAngle + 1.2 * dt) % (Math.PI * 2);
+      pet.x = this.survivor.x + Math.cos(pet.orbitAngle) * pet.orbitDistance;
+      pet.y = this.survivor.y + Math.sin(pet.orbitAngle) * pet.orbitDistance;
+
+      // Ataque automático do bichinho: alveja o zumbi mais próximo num raio de 350px
+      if (now - pet.lastAttackTimestamp >= pet.attackCooldownMs) {
+        let nearest: EnemyData | null = null;
+        let nearestDistSq = 350 * 350;
+
+        for (const enemy of this.enemies.values()) {
+          const dx = enemy.x - pet.x;
+          const dy = enemy.y - pet.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < nearestDistSq) {
+            nearestDistSq = distSq;
+            nearest = enemy;
+          }
+        }
+
+        if (nearest) {
+          pet.lastAttackTimestamp = now;
+          pet.targetEnemyId = nearest.id;
+          this.projectiles.push({
+            id: 'proj_pet_' + now + '_' + Math.random().toString(36).substring(2, 6),
+            x: pet.x,
+            y: pet.y,
+            targetX: nearest.x,
+            targetY: nearest.y,
+            damage: pet.damage,
+            speed: 480,
+            splashRadius: 20,
+            color: 0xffe600
+          });
+        }
+      }
+    }
+
+    for (const id of expired) {
+      this.companions.delete(id);
+    }
+  }
+
+  spawnOrUpgradeCompanion(userId: string, username: string, avatarUrl?: string, giftName = 'Presente'): void {
+    const now = Date.now();
+    const key = userId || username;
+    const existing = this.companions.get(key);
+
+    if (existing) {
+      existing.damage += 15;
+      existing.attackCooldownMs = Math.max(350, existing.attackCooldownMs - 100);
+      existing.expiresAt = now + 90000;
+      existing.giftName = giftName;
+      if (avatarUrl) existing.avatarUrl = avatarUrl;
+      this.addAnnouncement('GIFT', `Pet guardião de @${username} ficou mais forte com ${giftName}! (Dano: ${existing.damage})`, username);
+    } else {
+      const count = this.companions.size;
+      const baseDistance = 80 + (count % 3) * 25;
+      const angle = (count * ((2 * Math.PI) / 6)) % (Math.PI * 2);
+
+      const pet: CompanionPetData = {
+        id: 'pet_' + key.replace(/[^a-zA-Z0-9_-]/g, '') + '_' + Date.now(),
+        userId: key,
+        username,
+        avatarUrl,
+        giftName,
+        x: this.survivor.x + Math.cos(angle) * baseDistance,
+        y: this.survivor.y + Math.sin(angle) * baseDistance,
+        targetEnemyId: null,
+        damage: 35,
+        attackCooldownMs: 800,
+        lastAttackTimestamp: 0,
+        orbitAngle: angle,
+        orbitDistance: baseDistance,
+        expiresAt: now + 90000
+      };
+
+      this.companions.set(key, pet);
+      this.addAnnouncement('GIFT', `Novo bichinho guardião de @${username} invocado na arena!`, username);
+      this.emitVisualEffect({
+        id: 'pet_spawn_' + now,
+        type: 'LEVEL_UP',
+        x: pet.x,
+        y: pet.y,
+        radius: 60,
+        durationMs: 800
+      });
+    }
+  }
+
+  // ==========================================
   // DANO E VIDA DO SOBREVIVENTE
   // ==========================================
 
@@ -1051,7 +1160,12 @@ export class GameEngine extends EventEmitter {
         this.totalGiftsReceived += event.data.giftCount || 1;
         const giftName = event.data.giftName || 'Presente';
         const username = event.user.username;
-        this.addAnnouncement('GIFT', `@${username} enviou ${giftName}! Super bônus ativado!`, username);
+        const userId = event.user.id || username;
+        const avatarUrl = event.user.avatarUrl;
+
+        // Invocação ou fortalecimento do bichinho aliado do doador
+        this.spawnOrUpgradeCompanion(userId, username, avatarUrl, giftName);
+
         // Presentes ativam Supernova instantânea e curam o herói
         this.triggerSkill('EXPLOSAO', `@${username}`);
         this.healSurvivor(30);
@@ -1140,6 +1254,7 @@ export class GameEngine extends EventEmitter {
       },
       enemies: Array.from(this.enemies.values()),
       projectiles: [...this.projectiles],
+      companions: Array.from(this.companions.values()),
       wave: { ...this.waveState },
       collectiveGoal: { ...this.collectiveGoal },
       activeVote: this.activeVote ? { ...this.activeVote } : null,
