@@ -4,15 +4,15 @@ import { GameScene } from './scenes/GameScene.js';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: 1280,
-  height: 720,
+  width: 1080,
+  height: 1920,
   parent: 'game-container',
   backgroundColor: '#0b0c10',
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: 1280,
-    height: 720
+    width: 1080,
+    height: 1920
   },
   physics: {
     default: 'arcade',

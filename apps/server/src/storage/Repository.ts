@@ -22,8 +22,9 @@ export interface IRepository {
 }
 
 export const defaultSettings: GameSettings = {
-  arenaWidth: 1280,
-  arenaHeight: 720,
+  arenaWidth: 1080,
+  arenaHeight: 1920,
+  orientation: 'PORTRAIT',
   waveDurationSeconds: 30,
   bossWaveInterval: 5,
   maxEnemiesAlive: 60,

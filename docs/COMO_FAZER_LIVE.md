@@ -1,6 +1,6 @@
 # 🎥 Como Fazer Live com OBS Studio — ZOMBIE LIVE
 
-Este guia ensina como configurar o OBS Studio (ou Streamlabs OBS) para transmitir o **Zombie Live** em alta qualidade com proporção 16:9 profissional.
+Este guia ensina como configurar o OBS Studio (ou Streamlabs OBS / TikTok LIVE Studio) para transmitir o **Zombie Live** em **formato vertical nativo (1080 × 1920)**, padrão universal para transmissões ao vivo em celulares no TikTok LIVE.
 
 ---
 
@@ -10,29 +10,33 @@ Para garantir segurança e limpeza visual na transmissão, o Zombie Live possui 
 - Em desenvolvimento: `http://localhost:3000`
 - Em produção: `http://seu-servidor:4000/live`
 
-Esta rota contém **estritamente os elementos visuais do jogo** (arena, personagens, efeitos, vida e placar). **Nenhum controle administrativo, botão confidencial ou token é renderizado nessa tela.**
+Esta rota contém **estritamente os elementos visuais do jogo** (arena, personagens, efeitos, vida e placar) em resolução **1080 × 1920 (9:16)**. **Nenhum controle administrativo, botão confidencial ou token é renderizado nessa tela.**
 
 ---
 
 ## 2. Passo a Passo de Configuração no OBS Studio
 
-### Passo 1: Iniciar os Serviços do Zombie Live
-Certifique-se de que o servidor do jogo está em execução no seu computador (`npm run dev`).
+### Passo 1: Configurar a Tela do OBS em Modo Vertical (9:16)
+1. No OBS Studio, vá em **Configurações > Vídeo**.
+2. Altere os valores:
+   - **Resolução de Base (Tela)**: `1080x1920` (digite manualmente caso não apareça na lista).
+   - **Resolução de Saída (Escala)**: `1080x1920`.
+   - **Valores Comuns de FPS**: `60`.
+3. Clique em **Aplicar** e **OK**. A área de trabalho do OBS passará a ter o formato vertical de smartphone.
 
-### Passo 2: Adicionar a Fonte de Navegador
-1. Abra o **OBS Studio**.
-2. Na caixa **Fontes** (Sources), clique no botão **`+`** (Adicionar).
-3. Selecione a opção **Navegador** (Browser Source).
-4. Dê um nome para a fonte, como `Zombie Live - Jogo`.
-5. Na janela de propriedades que se abrir:
-   - **URL**: `http://localhost:3000` (ou a URL de produção).
-   - **Largura (Width)**: `1920` (ou `1280`).
-   - **Altura (Height)**: `1080` (ou `720`).
+### Passo 2: Adicionar a Fonte de Navegador do Zombie Live
+1. Na caixa **Fontes** (Sources), clique no botão **`+`** (Adicionar).
+2. Selecione a opção **Navegador** (Browser Source).
+3. Dê um nome para a fonte, como `Zombie Live - Jogo`.
+4. Na janela de propriedades que se abrir:
+   - **URL**: `http://localhost:3000` (ou a URL de produção do seu servidor).
+   - **Largura (Width)**: `1080`.
+   - **Altura (Height)**: `1920`.
    - **Taxa de quadros (FPS)**: `60`.
    - **Desmarcar**: "Desativar fonte quando invisível" (para manter o jogo sincronizado mesmo se você alternar de cena).
-6. Clique em **OK**.
+5. Clique em **OK**.
 
-A arena de sobrevivência do Zombie Live surgirá perfeitamente enquadrada na tela do seu OBS.
+A arena de sobrevivência do Zombie Live preencherá 100% da tela vertical do celular sem bordas pretas nas laterais!
 
 ---
 

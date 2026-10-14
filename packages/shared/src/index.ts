@@ -246,6 +246,7 @@ export interface MatchRecord {
 export interface GameSettings {
   arenaWidth: number;
   arenaHeight: number;
+  orientation?: 'PORTRAIT' | 'LANDSCAPE';
   waveDurationSeconds: number;
   bossWaveInterval: number;
   maxEnemiesAlive: number;
