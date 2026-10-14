@@ -1,0 +1,23 @@
+{
+  "name": "zombie-live-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace=@zombie-live/shared",
+    "build": "npm run build:shared && npm run build --workspace=@zombie-live/server && npm run build --workspace=@zombie-live/game && npm run build --workspace=@zombie-live/admin",
+    "test": "npm run test --workspace=@zombie-live/shared && npm run test --workspace=@zombie-live/server",
+    "dev:server": "npm run dev --workspace=@zombie-live/server",
+    "dev:game": "npm run dev --workspace=@zombie-live/game",
+    "dev:admin": "npm run dev --workspace=@zombie-live/admin",
+    "dev": "concurrently -k -n \"SERVER,GAME,ADMIN\" -c \"blue,green,magenta\" \"npm run dev:server\" \"npm run dev:game\" \"npm run dev:admin\"",
+    "start": "node apps/server/dist/index.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  }
+}

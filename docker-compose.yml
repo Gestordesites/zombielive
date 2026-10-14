@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL opcional para persistência duradoura
+  postgres:
+    image: postgres:16-alpine
+    container_name: zombie-live-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zombielive
+      POSTGRES_PASSWORD: zombielive_secret
+      POSTGRES_DB: zombielive
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zombielive -d zombielive"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Servidor Backend do Zombie Live
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zombie-live-server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      JWT_SECRET: replace_with_a_secure_token_in_production
+      DATABASE_URL: postgresql://zombielive:zombielive_secret@postgres:5432/zombielive
+      CLIENT_CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
