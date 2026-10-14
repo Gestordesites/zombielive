@@ -11,7 +11,9 @@ import {
   SkillType
 } from '@zombie-live/shared';
 
-const SERVER_URL = (import.meta as any).env?.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
+// Detecção automática de ambiente: conecta ao origin em produção ou porta 4000 em dev
+const isDevPort = window.location.port === '3000' || window.location.port === '3001' || window.location.port === '5173';
+const SERVER_URL = (import.meta as any).env?.VITE_SERVER_URL || (isDevPort ? `${window.location.protocol}//${window.location.hostname}:4000` : window.location.origin);
 
 class ApiService {
   private socket: Socket;
