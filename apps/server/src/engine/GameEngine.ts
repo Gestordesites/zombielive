@@ -235,6 +235,12 @@ export class GameEngine extends EventEmitter {
         this.matchStartTime = Date.now();
         this.lastTickTime = Date.now();
         this.addAnnouncement('SYSTEM', 'A horda chegou! Espectadores, usem os comandos para ajudar!');
+        
+        // Spawn inicial de horda (8 zumbis ao redor da arena)
+        for (let i = 0; i < 8; i++) {
+          this.spawnEnemy('COMMON');
+        }
+
         this.startLoop();
         this.emitStateUpdated();
       }
@@ -397,16 +403,21 @@ export class GameEngine extends EventEmitter {
 
   private spawnWaveEnemy(): void {
     const wave = this.waveState.currentWave;
-    const rand = Math.random();
-    let type: EnemyType = 'COMMON';
+    const packSize = Math.min(3, 1 + Math.floor(wave / 2));
 
-    if (wave >= 3 && rand < 0.25) {
-      type = 'TANK';
-    } else if (wave >= 2 && rand < 0.55) {
-      type = 'RUNNER';
+    for (let p = 0; p < packSize; p++) {
+      if (this.enemies.size >= this.settings.maxEnemiesAlive) break;
+      const rand = Math.random();
+      let type: EnemyType = 'COMMON';
+
+      if (wave >= 3 && rand < 0.25) {
+        type = 'TANK';
+      } else if (wave >= 2 && rand < 0.55) {
+        type = 'RUNNER';
+      }
+
+      this.spawnEnemy(type);
     }
-
-    this.spawnEnemy(type);
   }
 
   private spawnEnemy(type: EnemyType): EnemyData {

@@ -17,12 +17,23 @@ export class GameScene extends Phaser.Scene {
   private currentSnapshot: GameStateSnapshot | null = null;
   private lastProjectileCount: number = 0;
 
-  // Sprites
+  // Cenário e Iluminação
   private floorTile!: Phaser.GameObjects.TileSprite;
+  private survivorLight!: Phaser.GameObjects.Image;
+  private survivorShadow!: Phaser.GameObjects.Image;
+  private vignetteOverlay!: Phaser.GameObjects.Image;
+
+  // Personagens e Sprites
   private survivorSprite!: Phaser.GameObjects.Sprite;
   private survivorHealthBar!: Phaser.GameObjects.Graphics;
   private survivorShieldSprite!: Phaser.GameObjects.Sprite;
-  private enemySprites: Map<string, { sprite: Phaser.GameObjects.Sprite; healthBar: Phaser.GameObjects.Graphics; data: EnemyData }> = new Map();
+  private enemySprites: Map<string, {
+    sprite: Phaser.GameObjects.Sprite;
+    shadow: Phaser.GameObjects.Image;
+    healthBar: Phaser.GameObjects.Graphics;
+    data: EnemyData;
+    lastHp: number;
+  }> = new Map();
   private projectileSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private companionNodes: Map<string, {
     container: Phaser.GameObjects.Container;
@@ -32,7 +43,7 @@ export class GameScene extends Phaser.Scene {
     data: CompanionPetData;
   }> = new Map();
 
-  // Elementos do HUD
+  // Elementos do HUD Vertical
   private hudContainer!: Phaser.GameObjects.Container;
   private waveText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
@@ -84,30 +95,48 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    // 1. Chão da Arena (Vertical 9:16)
+    // 1. Chão da Arena Cartoon (Asfalto escuro com rachaduras tóxicas)
     this.floorTile = this.add.tileSprite(width / 2, height / 2, width, height, 'arena_floor');
 
-    // Bordas brilhantes da arena
-    const borders = this.add.graphics();
-    borders.lineStyle(6, 0x06b6d4, 0.85);
-    borders.strokeRect(12, 12, width - 24, height - 24);
-    borders.lineStyle(2, 0xef4444, 0.4);
-    borders.strokeRect(20, 20, width - 40, height - 40);
+    // 2. Iluminação Dinâmica ao redor do Herói
+    this.survivorLight = this.add.image(width / 2, height / 2, 'survivor_light')
+      .setDepth(2)
+      .setBlendMode(Phaser.BlendModes.ADD);
 
-    // 2. Sobrevivente
+    // Sombra suave do Sobrevivente
+    this.survivorShadow = this.add.image(width / 2, height / 2 + 28, 'shadow_blob')
+      .setDepth(3)
+      .setScale(0.85);
+
+    // Bordas de segurança da arena cartoon
+    const borders = this.add.graphics().setDepth(5);
+    borders.lineStyle(10, 0x050505, 1);
+    borders.strokeRect(8, 8, width - 16, height - 16);
+    borders.lineStyle(4, 0xef4444, 0.7);
+    borders.strokeRect(18, 18, width - 36, height - 36);
+
+    // 3. Sobrevivente Principal
     this.survivorShieldSprite = this.add.sprite(width / 2, height / 2, 'shield_bubble');
     this.survivorShieldSprite.setVisible(false);
     this.survivorShieldSprite.setDepth(15);
 
-    this.survivorSprite = this.add.sprite(width / 2, height / 2, 'survivor');
-    this.survivorSprite.setDepth(10);
-    this.survivorHealthBar = this.add.graphics();
-    this.survivorHealthBar.setDepth(11);
+    this.survivorSprite = this.add.sprite(width / 2, height / 2, 'survivor_idle')
+      .setDepth(10)
+      .setScale(0.72);
+    this.survivorSprite.play('survivor_walk_anim');
 
-    // 3. Montar HUD Vertical
+    this.survivorHealthBar = this.add.graphics();
+    this.survivorHealthBar.setDepth(16);
+
+    // 4. Vinheta atmosférica escura nas bordas da tela vertical
+    this.vignetteOverlay = this.add.image(width / 2, height / 2, 'vignette_overlay')
+      .setDepth(85)
+      .setScrollFactor(0);
+
+    // 5. Montar HUD Vertical
     this.createHud(width, height);
 
-    // 4. Conectar Socket
+    // 6. Conectar Socket
     this.socketClient = new GameSocketClient();
 
     const connOverlay = document.getElementById('connection-overlay');
@@ -136,7 +165,7 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    // 5. Conectar Efeitos Sonoros do Jogo e da Live
+    // 7. Efeitos Sonoros do Jogo e da Live
     this.socketClient.on(SOCKET_EVENTS.FOLLOWER_ANNOUNCEMENT, () => soundManager.playFollowerAlert());
     this.socketClient.on(SOCKET_EVENTS.COLLECTIVE_GOAL_ACHIEVED, () => soundManager.playGoalAchieved());
     this.socketClient.on(SOCKET_EVENTS.BOSS_SPAWNED, () => soundManager.playBossSpawn());
@@ -165,11 +194,17 @@ export class GameScene extends Phaser.Scene {
 
     // Header Superior (Barra escura translúcida otimizada para celular)
     const headerBg = this.add.graphics();
-    headerBg.fillStyle(0x0a0d14, 0.9);
-    headerBg.fillRect(0, 0, width, 115);
+    headerBg.fillStyle(0x0a0d14, 0.92);
+    headerBg.fillRect(0, 0, width, 125);
     headerBg.lineStyle(3, 0x1e293b, 1);
-    headerBg.lineBetween(0, 115, width, 115);
+    headerBg.lineBetween(0, 125, width, 125);
     this.hudContainer.add(headerBg);
+
+    // Logo Oficial do Zombie Live (da imagem de referência)
+    if (this.textures.exists('zombies_live_logo')) {
+      const logoImg = this.add.image(width / 2, 62, 'zombies_live_logo').setDisplaySize(110, 110);
+      this.hudContainer.add(logoImg);
+    }
 
     // Linha 1: Onda, Timer e Badge do Provedor
     this.waveText = this.add.text(32, 20, 'ONDA 1', {
@@ -177,9 +212,9 @@ export class GameScene extends Phaser.Scene {
       fontSize: '32px',
       color: '#38bdf8'
     });
-    this.timerText = this.add.text(190, 24, '⏱️ 00:30', {
+    this.timerText = this.add.text(175, 24, '⏱️ 00:30', {
       fontFamily: 'Segoe UI, sans-serif',
-      fontSize: '24px',
+      fontSize: '22px',
       color: '#f8fafc',
       fontStyle: 'bold'
     });
@@ -193,22 +228,22 @@ export class GameScene extends Phaser.Scene {
     this.hudContainer.add([this.waveText, this.timerText, this.providerBadgeText]);
 
     // Linha 2: Zumbis Eliminados e Pontuação
-    this.killsText = this.add.text(32, 68, '💀 0 Eliminados', {
+    this.killsText = this.add.text(32, 70, '💀 0 Eliminados', {
       fontFamily: 'Segoe UI, sans-serif',
-      fontSize: '22px',
+      fontSize: '20px',
       color: '#ef4444',
       fontStyle: 'bold'
     });
-    this.scoreText = this.add.text(360, 68, '🏆 0 Pontos', {
+    this.scoreText = this.add.text(230, 70, '🏆 0 Pontos', {
       fontFamily: 'Segoe UI, sans-serif',
-      fontSize: '22px',
+      fontSize: '20px',
       color: '#facc15',
       fontStyle: 'bold'
     });
     this.hudContainer.add([this.killsText, this.scoreText]);
 
     // Barra de Chefe (Abaixo do header)
-    this.bossBarContainer = this.add.container(width / 2, 160).setVisible(false).setDepth(110);
+    this.bossBarContainer = this.add.container(width / 2, 168).setVisible(false).setDepth(110);
     const bossBg = this.add.graphics();
     bossBg.fillStyle(0x450a0a, 0.95);
     bossBg.fillRoundedRect(-420, -22, 840, 46, 8);
@@ -224,7 +259,7 @@ export class GameScene extends Phaser.Scene {
     this.bossBarContainer.add([bossBg, this.bossBarGfx, this.bossNameText]);
 
     // Banner Flutuante de Anúncios (Seguidores, Presentes, Metas)
-    this.announcementContainer = this.add.container(width / 2, 235).setAlpha(0).setDepth(120);
+    this.announcementContainer = this.add.container(width / 2, 245).setAlpha(0).setDepth(120);
     const annBg = this.add.graphics();
     annBg.fillStyle(0x1e1b4b, 0.95);
     annBg.fillRoundedRect(-380, -24, 760, 48, 24);
@@ -246,7 +281,7 @@ export class GameScene extends Phaser.Scene {
     bottomGfx.strokeRoundedRect(30, height - 215, width - 60, 185, 16);
     this.hudContainer.add(bottomGfx);
 
-    // Vida e XP (Coluna Esquerda do Card Inferior)
+    // Vida e XP
     this.hpBarGfx = this.add.graphics();
     this.hudContainer.add(this.hpBarGfx);
 
@@ -269,7 +304,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.hudContainer.add(this.xpText);
 
-    // Meta Coletiva (Coluna Direita do Card Inferior)
+    // Meta Coletiva
     this.goalBarGfx = this.add.graphics();
     this.hudContainer.add(this.goalBarGfx);
 
@@ -343,8 +378,10 @@ export class GameScene extends Phaser.Scene {
     if (!this.currentSnapshot) return;
     const snap = this.currentSnapshot;
 
-    // 1. Atualizar Sobrevivente
+    // 1. Atualizar Sobrevivente Principal
     this.survivorSprite.setPosition(snap.survivor.x, snap.survivor.y);
+    this.survivorShadow.setPosition(snap.survivor.x, snap.survivor.y + 24);
+    this.survivorLight.setPosition(snap.survivor.x, snap.survivor.y);
     this.survivorShieldSprite.setPosition(snap.survivor.x, snap.survivor.y);
     this.survivorShieldSprite.setVisible(snap.survivor.shieldActive);
 
@@ -362,15 +399,22 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // Disparo / Animação de tiro quando novos projéteis são disparados
+    if (snap.projectiles.length > this.lastProjectileCount) {
+      soundManager.playShoot();
+      this.survivorSprite.play('survivor_shoot_anim');
+    }
+    this.lastProjectileCount = snap.projectiles.length;
+
     // Mini barra de vida sobre o sobrevivente
     this.survivorHealthBar.clear();
     const hpRatio = Math.max(0, snap.survivor.hp / snap.survivor.maxHp);
-    this.survivorHealthBar.fillStyle(0x000000, 0.6);
-    this.survivorHealthBar.fillRect(snap.survivor.x - 24, snap.survivor.y - 32, 48, 6);
+    this.survivorHealthBar.fillStyle(0x050505, 0.7);
+    this.survivorHealthBar.fillRect(snap.survivor.x - 26, snap.survivor.y - 38, 52, 7);
     this.survivorHealthBar.fillStyle(hpRatio > 0.3 ? 0x22c55e : 0xef4444, 1);
-    this.survivorHealthBar.fillRect(snap.survivor.x - 24, snap.survivor.y - 32, 48 * hpRatio, 6);
+    this.survivorHealthBar.fillRect(snap.survivor.x - 26, snap.survivor.y - 38, 52 * hpRatio, 7);
 
-    // 2. Atualizar Inimigos
+    // 2. Atualizar Inimigos Zumbis
     const activeEnemyIds = new Set<string>();
 
     for (const enemyData of snap.enemies) {
@@ -379,32 +423,67 @@ export class GameScene extends Phaser.Scene {
 
       if (!enemyObj) {
         let texture = 'zombie_common';
-        if (enemyData.type === 'RUNNER') texture = 'zombie_runner';
-        else if (enemyData.type === 'TANK') texture = 'zombie_tank';
-        else if (enemyData.type === 'BOSS') texture = 'zombie_boss';
+        let animKey = 'zombie_common_walk_anim';
+        let scale = 0.60;
+        let shadowScale = 0.70;
 
-        const sprite = this.add.sprite(enemyData.x, enemyData.y, texture).setDepth(enemyData.isBoss ? 9 : 8);
+        if (enemyData.type === 'RUNNER') {
+          texture = 'zombie_runner';
+          animKey = 'zombie_runner_walk_anim';
+          scale = 0.55;
+          shadowScale = 0.65;
+        } else if (enemyData.type === 'TANK') {
+          texture = 'zombie_tank';
+          animKey = 'zombie_tank_walk_anim';
+          scale = 0.72;
+          shadowScale = 1.15;
+        } else if (enemyData.type === 'BOSS') {
+          texture = 'zombie_boss';
+          animKey = 'zombie_boss_walk_anim';
+          scale = 0.82;
+          shadowScale = 2.10;
+        }
+
+        const shadow = this.add.image(enemyData.x, enemyData.y + 24, 'shadow_blob')
+          .setDepth(enemyData.isBoss ? 7 : 6)
+          .setScale(shadowScale);
+
+        const sprite = this.add.sprite(enemyData.x, enemyData.y, texture)
+          .setDepth(enemyData.isBoss ? 9 : 8)
+          .setScale(scale);
+        sprite.play(animKey);
+
         const healthBar = this.add.graphics().setDepth(enemyData.isBoss ? 10 : 9);
-        enemyObj = { sprite, healthBar, data: enemyData };
+        enemyObj = { sprite, shadow, healthBar, data: enemyData, lastHp: enemyData.hp };
         this.enemySprites.set(enemyData.id, enemyObj);
       }
 
-      // Interpolação suave
-      enemyObj.sprite.x += (enemyData.x - enemyObj.sprite.x) * 0.4;
-      enemyObj.sprite.y += (enemyData.y - enemyObj.sprite.y) * 0.4;
+      // Interpolação suave de posição
+      enemyObj.sprite.x += (enemyData.x - enemyObj.sprite.x) * 0.42;
+      enemyObj.sprite.y += (enemyData.y - enemyObj.sprite.y) * 0.42;
+      enemyObj.shadow.setPosition(enemyObj.sprite.x, enemyObj.sprite.y + (enemyData.isBoss ? 55 : 24));
 
       // Rotação do zumbi olhando para o herói
       const angle = Phaser.Math.Angle.Between(enemyObj.sprite.x, enemyObj.sprite.y, snap.survivor.x, snap.survivor.y);
       enemyObj.sprite.setRotation(angle);
 
+      // Efeito de Dano / Flash ao ser atingido
+      if (enemyData.hp < enemyObj.lastHp) {
+        enemyObj.sprite.setTint(0xff7777);
+        this.time.delayedCall(80, () => {
+          if (enemyObj.sprite && enemyObj.sprite.active) enemyObj.sprite.clearTint();
+        });
+        enemyObj.lastHp = enemyData.hp;
+      }
+
       // Mini barra de vida sobre o zumbi
       enemyObj.healthBar.clear();
       const zHpRatio = Math.max(0, enemyData.hp / enemyData.maxHp);
-      const barWidth = enemyData.isBoss ? 80 : 32;
-      const barHeight = enemyData.isBoss ? 7 : 4;
-      const offsetY = enemyData.isBoss ? 56 : 24;
+      const barWidth = enemyData.isBoss ? 88 : 34;
+      const barHeight = enemyData.isBoss ? 8 : 5;
+      const offsetY = enemyData.isBoss ? 64 : 28;
 
-      enemyObj.healthBar.fillStyle(0x000000, 0.6);
+      enemyObj.healthBar.fillStyle(0x050505, 0.7);
       enemyObj.healthBar.fillRect(enemyObj.sprite.x - barWidth / 2, enemyObj.sprite.y - offsetY, barWidth, barHeight);
       enemyObj.healthBar.fillStyle(enemyData.isBoss ? 0xdc2626 : 0x16a34a, 1);
       enemyObj.healthBar.fillRect(enemyObj.sprite.x - barWidth / 2, enemyObj.sprite.y - offsetY, barWidth * zHpRatio, barHeight);
@@ -413,20 +492,15 @@ export class GameScene extends Phaser.Scene {
     // Remove zumbis que não estão mais no snapshot (derrotados)
     for (const [id, enemyObj] of this.enemySprites.entries()) {
       if (!activeEnemyIds.has(id)) {
-        // Efeito de explosão de sangue/partícula ao morrer
-        this.createDeathPuff(enemyObj.sprite.x, enemyObj.sprite.y);
+        this.createDeathPuff(enemyObj.sprite.x, enemyObj.sprite.y, enemyObj.data.isBoss);
         enemyObj.sprite.destroy();
+        enemyObj.shadow.destroy();
         enemyObj.healthBar.destroy();
         this.enemySprites.delete(id);
       }
     }
 
     // 3. Atualizar Projéteis
-    if (snap.projectiles.length > this.lastProjectileCount) {
-      soundManager.playShoot();
-    }
-    this.lastProjectileCount = snap.projectiles.length;
-
     const activeProjIds = new Set<string>();
     for (const projData of snap.projectiles) {
       activeProjIds.add(projData.id);
@@ -441,6 +515,15 @@ export class GameScene extends Phaser.Scene {
 
     for (const [id, pSprite] of this.projectileSprites.entries()) {
       if (!activeProjIds.has(id)) {
+        // Faísca de impacto cartoon
+        const spark = this.add.image(pSprite.x, pSprite.y, 'fx_hit_spark').setDepth(15).setScale(0.7);
+        this.tweens.add({
+          targets: spark,
+          alpha: 0,
+          scale: 1.2,
+          duration: 120,
+          onComplete: () => spark.destroy()
+        });
         pSprite.destroy();
         this.projectileSprites.delete(id);
       }
@@ -454,7 +537,7 @@ export class GameScene extends Phaser.Scene {
 
       if (!cObj) {
         const container = this.add.container(petData.x, petData.y).setDepth(14);
-        const petSprite = this.add.sprite(0, 0, 'companion_pet');
+        const petSprite = this.add.sprite(0, 0, 'companion_pet').setScale(0.65);
 
         // Badge estilizada com o nome do espectador e ícone de estrela
         const nameTag = this.add.text(0, -28, `⭐ @${petData.username}`, {
@@ -465,7 +548,7 @@ export class GameScene extends Phaser.Scene {
           padding: { x: 6, y: 2 }
         }).setOrigin(0.5);
 
-        // Suporte a avatar de perfil do TikTok (se presente na live)
+        // Suporte a avatar de perfil do TikTok
         let avatarImg: Phaser.GameObjects.Image | undefined;
         if (petData.avatarUrl) {
           const key = `avatar_${petData.userId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
@@ -505,13 +588,13 @@ export class GameScene extends Phaser.Scene {
 
     for (const [id, cObj] of this.companionNodes.entries()) {
       if (!activeCompanionIds.has(id)) {
-        this.createDeathPuff(cObj.container.x, cObj.container.y);
+        this.createDeathPuff(cObj.container.x, cObj.container.y, false);
         cObj.container.destroy();
         this.companionNodes.delete(id);
       }
     }
 
-    // 4. Chefe
+    // 5. Chefe
     if (snap.wave.isBossActive) {
       this.bossBarContainer.setVisible(true);
       this.bossBarGfx.clear();
@@ -523,7 +606,7 @@ export class GameScene extends Phaser.Scene {
       this.bossBarContainer.setVisible(false);
     }
 
-    // 5. Votação
+    // 6. Votação
     if (snap.activeVote && snap.activeVote.active) {
       this.voteContainer.setVisible(true);
       this.voteTimerText.setText(`Digite no chat: VOTAR 1, VOTAR 2 ou VOTAR 3 (⏱️ ${Math.ceil(snap.activeVote.timeRemainingSeconds)}s)`);
@@ -536,7 +619,7 @@ export class GameScene extends Phaser.Scene {
       this.voteContainer.setVisible(false);
     }
 
-    // 6. Overlays de Estado
+    // 7. Overlays de Estado
     this.updateStateOverlay(snap.status);
   }
 
@@ -619,107 +702,194 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ==========================================
-  // EFEITOS VISUAIS
+  // EFEITOS VISUAIS E HABILIDADES CARTOON
   // ==========================================
 
   private playVisualEffect(effect: VisualEffectEvent): void {
-    const gfx = this.add.graphics().setDepth(30);
-
     switch (effect.type) {
       case 'EXPLOSION': {
-        gfx.lineStyle(6, 0xf97316, 1);
-        gfx.strokeCircle(effect.x, effect.y, effect.radius);
-        gfx.fillStyle(0xfef08a, 0.4);
-        gfx.fillCircle(effect.x, effect.y, effect.radius);
+        const expG = this.add.graphics().setDepth(35);
+        expG.fillStyle(0xfef08a, 0.7);
+        expG.fillCircle(effect.x, effect.y, effect.radius * 0.4);
+        expG.lineStyle(8, 0xf97316, 1);
+        expG.strokeCircle(effect.x, effect.y, effect.radius);
+
+        const expSpark = this.add.image(effect.x, effect.y, 'fx_hit_spark').setDepth(36).setScale(effect.radius / 30);
         this.tweens.add({
-          targets: gfx,
+          targets: [expG, expSpark],
           alpha: 0,
-          scale: 1.3,
+          scale: 1.5,
           duration: effect.durationMs,
-          onComplete: () => gfx.destroy()
+          onComplete: () => {
+            expG.destroy();
+            expSpark.destroy();
+          }
         });
         break;
       }
 
       case 'SLASH': {
-        gfx.lineStyle(4, 0x38bdf8, 1);
-        gfx.strokeCircle(effect.x, effect.y, effect.radius);
+        const slash = this.add.image(effect.x, effect.y, 'fx_slash_arc')
+          .setDepth(32)
+          .setScale(effect.radius / 55);
         this.tweens.add({
-          targets: gfx,
+          targets: slash,
+          angle: 360,
           alpha: 0,
           duration: effect.durationMs,
-          onComplete: () => gfx.destroy()
+          onComplete: () => slash.destroy()
         });
         break;
       }
 
       case 'FIRE_AREA': {
-        gfx.fillStyle(0xe11d48, 0.35);
-        gfx.fillCircle(effect.x, effect.y, effect.radius);
-        gfx.lineStyle(2, 0xf97316, 0.8);
-        gfx.strokeCircle(effect.x, effect.y, effect.radius);
+        const fireG = this.add.graphics().setDepth(25);
+        fireG.fillStyle(0xe11d48, 0.4);
+        fireG.fillCircle(effect.x, effect.y, effect.radius);
+        fireG.lineStyle(5, 0xf59e0b, 0.9);
+        fireG.strokeCircle(effect.x, effect.y, effect.radius);
+
+        const fireSprites: Phaser.GameObjects.Sprite[] = [];
+        for (let i = 0; i < 8; i++) {
+          const a = (i * Math.PI) / 4;
+          const dist = effect.radius * 0.65;
+          const fs = this.add.sprite(effect.x + Math.cos(a) * dist, effect.y + Math.sin(a) * dist, 'particle_fire')
+            .setDepth(26)
+            .setScale(1.4);
+          fireSprites.push(fs);
+        }
+
         this.tweens.add({
-          targets: gfx,
+          targets: [fireG, ...fireSprites],
           alpha: 0,
           duration: effect.durationMs,
-          onComplete: () => gfx.destroy()
+          onComplete: () => {
+            fireG.destroy();
+            fireSprites.forEach(s => s.destroy());
+          }
         });
         break;
       }
 
       case 'ICE_BLAST': {
-        gfx.fillStyle(0x06b6d4, 0.3);
-        gfx.fillCircle(effect.x, effect.y, effect.radius);
-        gfx.lineStyle(4, 0x67e8f9, 0.9);
-        gfx.strokeCircle(effect.x, effect.y, effect.radius);
+        const iceG = this.add.graphics().setDepth(25);
+        iceG.fillStyle(0x06b6d4, 0.35);
+        iceG.fillCircle(effect.x, effect.y, effect.radius);
+        iceG.lineStyle(6, 0xa5f3fc, 0.95);
+        iceG.strokeCircle(effect.x, effect.y, effect.radius);
+
+        const iceSprites: Phaser.GameObjects.Sprite[] = [];
+        for (let i = 0; i < 8; i++) {
+          const a = (i * Math.PI) / 4;
+          const dist = effect.radius * 0.6;
+          const is = this.add.sprite(effect.x + Math.cos(a) * dist, effect.y + Math.sin(a) * dist, 'particle_ice')
+            .setDepth(26)
+            .setScale(1.5);
+          iceSprites.push(is);
+        }
+
         this.tweens.add({
-          targets: gfx,
+          targets: [iceG, ...iceSprites],
           alpha: 0,
           duration: effect.durationMs,
-          onComplete: () => gfx.destroy()
+          onComplete: () => {
+            iceG.destroy();
+            iceSprites.forEach(s => s.destroy());
+          }
         });
         break;
       }
 
       case 'HEAL_RING': {
-        gfx.lineStyle(5, 0x22c55e, 1);
-        gfx.strokeCircle(effect.x, effect.y, effect.radius);
+        const healG = this.add.graphics().setDepth(32);
+        healG.lineStyle(6, 0x22c55e, 0.9);
+        healG.strokeCircle(effect.x, effect.y, effect.radius);
+
+        const cross = this.add.image(effect.x, effect.y - 20, 'fx_heal_cross')
+          .setDepth(33)
+          .setScale(1.2);
         this.tweens.add({
-          targets: gfx,
+          targets: cross,
+          y: effect.y - 70,
+          alpha: 0,
+          duration: effect.durationMs,
+          onComplete: () => cross.destroy()
+        });
+
+        this.tweens.add({
+          targets: healG,
           alpha: 0,
           scale: 1.4,
           duration: effect.durationMs,
-          onComplete: () => gfx.destroy()
+          onComplete: () => healG.destroy()
+        });
+        break;
+      }
+
+      case 'SHIELD_PULSE': {
+        const pulse = this.add.image(effect.x, effect.y, 'shield_bubble')
+          .setDepth(30)
+          .setScale(0.8);
+        this.tweens.add({
+          targets: pulse,
+          scale: 1.4,
+          alpha: 0,
+          duration: effect.durationMs,
+          onComplete: () => pulse.destroy()
         });
         break;
       }
 
       case 'LEVEL_UP': {
-        gfx.lineStyle(6, 0xfacc15, 1);
-        gfx.strokeCircle(effect.x, effect.y, effect.radius);
+        const lvlG = this.add.graphics().setDepth(35);
+        lvlG.lineStyle(8, 0xfacc15, 1);
+        lvlG.strokeCircle(effect.x, effect.y, effect.radius);
+
+        const star = this.add.image(effect.x, effect.y, 'projectile_pet')
+          .setDepth(36)
+          .setScale(2.5);
+
         this.tweens.add({
-          targets: gfx,
+          targets: [lvlG, star],
           alpha: 0,
-          scale: 1.8,
+          scale: 2.2,
           duration: effect.durationMs,
-          onComplete: () => gfx.destroy()
+          onComplete: () => {
+            lvlG.destroy();
+            star.destroy();
+          }
         });
         break;
       }
     }
   }
 
-  private createDeathPuff(x: number, y: number): void {
-    const puff = this.add.graphics().setDepth(20);
-    puff.fillStyle(0x16a34a, 0.8);
-    puff.fillCircle(x, y, 16);
-    this.tweens.add({
-      targets: puff,
-      alpha: 0,
-      scale: 1.6,
-      duration: 350,
-      onComplete: () => puff.destroy()
-    });
+  private createDeathPuff(x: number, y: number, isBoss = false): void {
+    const puffCount = isBoss ? 12 : 5;
+    const color = isBoss ? 0xdc2626 : 0x65a30d;
+
+    for (let i = 0; i < puffCount; i++) {
+      const p = this.add.graphics().setDepth(20);
+      p.fillStyle(color, 0.9);
+      p.fillCircle(x, y, isBoss ? 16 : 9);
+      p.lineStyle(2, 0x050505, 1);
+      p.strokeCircle(x, y, isBoss ? 16 : 9);
+
+      const a = (i * (Math.PI * 2)) / puffCount;
+      const dist = isBoss ? 80 : 35;
+      const targetX = x + Math.cos(a) * dist;
+      const targetY = y + Math.sin(a) * dist;
+
+      this.tweens.add({
+        targets: p,
+        x: targetX - x,
+        y: targetY - y,
+        alpha: 0,
+        scale: 0.3,
+        duration: isBoss ? 600 : 350,
+        onComplete: () => p.destroy()
+      });
+    }
   }
 
   private showAnnouncement(text: string): void {
