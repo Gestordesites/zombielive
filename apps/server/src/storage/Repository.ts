@@ -25,17 +25,17 @@ export const defaultSettings: GameSettings = {
   arenaWidth: 1080,
   arenaHeight: 1920,
   orientation: 'PORTRAIT',
-  waveDurationSeconds: 30,
+  waveDurationSeconds: 45,
   bossWaveInterval: 5,
-  maxEnemiesAlive: 60,
-  commandCooldownPerUserMs: 2000,
+  maxEnemiesAlive: 25,
+  commandCooldownPerUserMs: 1500,
   commandGlobalRateLimitPerSec: 50,
   collectiveGoalLikesTarget: 500,
   soundEnabled: true,
   reducedVfx: false,
   welcomeFollowerText: 'NOVO SOBREVIVENTE!',
   autoStartMatches: true,
-  autoRestartSeconds: 7
+  autoRestartSeconds: 5
 };
 
 /**

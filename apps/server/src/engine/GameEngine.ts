@@ -121,60 +121,60 @@ export class GameEngine extends EventEmitter {
       CURA: {
         id: 'CURA',
         name: 'Cura Espiritual',
-        cooldownMs: 8000,
+        cooldownMs: 6000,
         lastUsedMs: 0,
         durationMs: 0,
-        intensity: 50,
-        description: 'Restaura instantaneamente +50 de Vida.',
+        intensity: 80,
+        description: 'Restaura instantaneamente +80 de Vida.',
         visualEffect: 'green_glow'
       },
       ESCUDO: {
         id: 'ESCUDO',
         name: 'Barreira Titânica',
-        cooldownMs: 12000,
+        cooldownMs: 10000,
         lastUsedMs: 0,
-        durationMs: 6000,
-        intensity: 0.8,
-        description: 'Reduz 80% do dano recebido por 6 segundos.',
+        durationMs: 8000,
+        intensity: 0.85,
+        description: 'Reduz 85% do dano recebido por 8 segundos.',
         visualEffect: 'blue_barrier'
       },
       ATAQUE: {
         id: 'ATAQUE',
         name: 'Golpe Giratório',
-        cooldownMs: 6000,
+        cooldownMs: 5000,
         lastUsedMs: 0,
         durationMs: 0,
-        intensity: 160,
+        intensity: 220,
         description: 'Desfere um golpe de espada em 360° em todos os zumbis ao redor.',
         visualEffect: 'sword_arc'
       },
       FOGO: {
         id: 'FOGO',
         name: 'Onda Incendiária',
-        cooldownMs: 10000,
+        cooldownMs: 8000,
         lastUsedMs: 0,
-        durationMs: 4000,
-        intensity: 40,
+        durationMs: 5000,
+        intensity: 60,
         description: 'Incendeia o solo em raio amplo, causando dano contínuo.',
         visualEffect: 'fire_wave'
       },
       CONGELAMENTO: {
         id: 'CONGELAMENTO',
         name: 'Nevasca Ártica',
-        cooldownMs: 12000,
+        cooldownMs: 10000,
         lastUsedMs: 0,
-        durationMs: 5000,
-        intensity: 0.75,
-        description: 'Reduz a velocidade de todos os zumbis em 75% por 5 segundos.',
+        durationMs: 6000,
+        intensity: 0.8,
+        description: 'Reduz a velocidade de todos os zumbis em 80% por 6 segundos.',
         visualEffect: 'ice_burst'
       },
       EXPLOSAO: {
         id: 'EXPLOSAO',
         name: 'Supernova',
-        cooldownMs: 15000,
+        cooldownMs: 12000,
         lastUsedMs: 0,
         durationMs: 0,
-        intensity: 300,
+        intensity: 450,
         description: 'Uma explosão colossal que aniquila zumbis próximos.',
         visualEffect: 'explosion'
       }
@@ -183,16 +183,16 @@ export class GameEngine extends EventEmitter {
     this.survivor = {
       x: this.settings.arenaWidth / 2,
       y: this.settings.arenaHeight / 2,
-      hp: 100,
-      maxHp: 100,
-      speed: 160,
-      damage: 35,
-      attackRange: 220,
-      attackRate: 1.8,
-      armor: 0.1,
+      hp: 250,
+      maxHp: 250,
+      speed: 180,
+      damage: 55,
+      attackRange: 280,
+      attackRate: 2.2,
+      armor: 0.25,
       level: 1,
       xp: 0,
-      xpNeeded: 50,
+      xpNeeded: 40,
       kills: 0,
       shieldActive: false,
       shieldExpiresAt: 0,
@@ -424,9 +424,9 @@ export class GameEngine extends EventEmitter {
       }
     }
 
-    // Spawn regular de inimigos
+    // Spawn regular de inimigos: cadência mais suave e espaçada para o jogo durar mais
     this.enemySpawnTimer += dt;
-    const baseSpawnRate = Math.max(0.6, 2.0 - this.waveState.currentWave * 0.15); // intervalo entre spawns
+    const baseSpawnRate = Math.max(2.0, 4.0 - this.waveState.currentWave * 0.25); // intervalo entre spawns
 
     if (this.enemySpawnTimer >= baseSpawnRate) {
       this.enemySpawnTimer = 0;
@@ -438,16 +438,17 @@ export class GameEngine extends EventEmitter {
 
   private spawnWaveEnemy(): void {
     const wave = this.waveState.currentWave;
-    const packSize = Math.min(3, 1 + Math.floor(wave / 2));
+    // Até a onda 3 surge 1 inimigo por vez; ondas superiores no máximo 2 por vez
+    const packSize = wave <= 3 ? 1 : Math.min(2, 1 + Math.floor((wave - 3) / 3));
 
     for (let p = 0; p < packSize; p++) {
       if (this.enemies.size >= this.settings.maxEnemiesAlive) break;
       const rand = Math.random();
       let type: EnemyType = 'COMMON';
 
-      if (wave >= 3 && rand < 0.25) {
+      if (wave >= 4 && rand < 0.20) {
         type = 'TANK';
-      } else if (wave >= 2 && rand < 0.55) {
+      } else if (wave >= 3 && rand < 0.40) {
         type = 'RUNNER';
       }
 
@@ -459,26 +460,26 @@ export class GameEngine extends EventEmitter {
     const id = 'enemy_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     const { x, y } = this.getRandomSpawnBorder();
 
-    const waveMult = 1 + (this.waveState.currentWave - 1) * 0.12;
+    const waveMult = 1 + (this.waveState.currentWave - 1) * 0.08;
 
-    let hp = 100 * waveMult;
-    let speed = 80;
-    let damage = 10 * waveMult;
+    let hp = 50 * waveMult;
+    let speed = 50;
+    let damage = 4 * waveMult;
     let radius = 24;
     let xpReward = 10;
     let scoreReward = 100;
 
     if (type === 'RUNNER') {
-      hp = 50 * waveMult;
-      speed = 150;
-      damage = 12 * waveMult;
+      hp = 30 * waveMult;
+      speed = 85;
+      damage = 5 * waveMult;
       radius = 20;
       xpReward = 15;
       scoreReward = 150;
     } else if (type === 'TANK') {
-      hp = 350 * waveMult;
-      speed = 45;
-      damage = 25 * waveMult;
+      hp = 180 * waveMult;
+      speed = 30;
+      damage = 10 * waveMult;
       radius = 36;
       xpReward = 35;
       scoreReward = 300;
@@ -507,7 +508,7 @@ export class GameEngine extends EventEmitter {
     const id = 'boss_' + Date.now();
     const x = this.settings.arenaWidth / 2;
     const y = 80; // surge no topo da arena
-    const bossHp = 2500 + (this.waveState.currentWave - 5) * 800;
+    const bossHp = 1000 + (this.waveState.currentWave - 5) * 400;
 
     const boss: EnemyData = {
       id,
@@ -516,8 +517,8 @@ export class GameEngine extends EventEmitter {
       y,
       hp: bossHp,
       maxHp: bossHp,
-      speed: 60,
-      damage: 40,
+      speed: 40,
+      damage: 18,
       radius: 56,
       xpReward: 300,
       scoreReward: 2500,
@@ -568,12 +569,15 @@ export class GameEngine extends EventEmitter {
 
     this.survivor.targetEnemyId = closestEnemy ? closestEnemy.id : null;
 
+    // Regeneração passiva natural para manter a partida emocionante e duradoura
+    this.survivor.hp = Math.min(this.survivor.maxHp, this.survivor.hp + 2 * dt);
+
     // 2. Movimentação inteligente (Kiting & desvio de ameaças)
     let moveX = 0;
     let moveY = 0;
     const closestDist = Math.sqrt(closestDistSq);
 
-    if (closestEnemy && closestDist < 120) {
+    if (closestEnemy && closestDist < 160) {
       // Perigo próximo: recua na direção oposta ao zumbi mais próximo
       const dx = this.survivor.x - closestEnemy.x;
       const dy = this.survivor.y - closestEnemy.y;
@@ -617,7 +621,7 @@ export class GameEngine extends EventEmitter {
       targetX: target.x,
       targetY: target.y,
       damage: this.survivor.damage,
-      speed: 550
+      speed: 650
     });
   }
 

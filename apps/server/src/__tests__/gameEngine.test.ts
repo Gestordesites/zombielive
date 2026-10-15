@@ -22,7 +22,7 @@ describe('GameEngine & Core Mechanics', () => {
   it('deve inicializar no estado IDLE com valores padrão', () => {
     const snap = engine.getSnapshot();
     assert.strictEqual(snap.status, 'IDLE');
-    assert.strictEqual(snap.survivor.hp, 100);
+    assert.strictEqual(snap.survivor.hp, 250);
     assert.strictEqual(snap.survivor.level, 1);
     assert.strictEqual(snap.score, 0);
     assert.strictEqual(snap.kills, 0);
@@ -33,17 +33,17 @@ describe('GameEngine & Core Mechanics', () => {
     // Aplica dano manual
     engine.damageSurvivor(40);
     let snap = engine.getSnapshot();
-    assert.strictEqual(snap.survivor.hp, 64); // 40 * (1 - 0.1 armor) = 36 de dano -> 100 - 36 = 64
+    assert.strictEqual(snap.survivor.hp, 220); // 40 * (1 - 0.25 armor) = 30 de dano -> 250 - 30 = 220
 
     // Cura parcial
     engine.healSurvivor(20);
     snap = engine.getSnapshot();
-    assert.strictEqual(snap.survivor.hp, 84);
+    assert.strictEqual(snap.survivor.hp, 240);
 
     // Cura excedente (não pode passar de maxHp)
     engine.healSurvivor(50);
     snap = engine.getSnapshot();
-    assert.strictEqual(snap.survivor.hp, 100);
+    assert.strictEqual(snap.survivor.hp, 250);
   });
 
   it('deve ativar habilidades especiais com recarga (cooldown)', () => {
