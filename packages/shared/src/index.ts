@@ -277,6 +277,9 @@ export interface GameSettings {
   welcomeFollowerText: string;
   autoStartMatches: boolean;
   autoRestartSeconds: number;
+  liveProvider?: LiveProviderType;
+  tiktokUsername?: string;
+  tiktokSessionId?: string;
 }
 
 // 15. Contrato de Eventos Socket.IO

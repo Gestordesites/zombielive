@@ -79,6 +79,14 @@ describe('GameEngine & Core Mechanics', () => {
     assert.strictEqual(snap.collectiveGoal.progressPercent, 30);
   });
 
+  it('deve atualizar providerType dinamicamente no snapshot', () => {
+    assert.strictEqual(engine.getSnapshot().providerType, 'SIMULATOR');
+    engine.setProviderType('CONNECTED');
+    assert.strictEqual(engine.getSnapshot().providerType, 'CONNECTED');
+    engine.setProviderType('DISCONNECTED');
+    assert.strictEqual(engine.getSnapshot().providerType, 'DISCONNECTED');
+  });
+
   it('deve agendar reinício automático após GAME_OVER quando autoStartMatches estiver ativo', (_t, done) => {
     engine.updateSettings({ autoStartMatches: true, autoRestartSeconds: 1 });
     (engine as any).status = 'PLAYING';
@@ -86,6 +94,7 @@ describe('GameEngine & Core Mechanics', () => {
     assert.strictEqual(engine.getSnapshot().status, 'GAME_OVER');
     setTimeout(() => {
       assert.strictEqual(engine.getSnapshot().status, 'COUNTDOWN');
+      engine.updateSettings({ autoStartMatches: false });
       engine.stopMatch('ABORTED');
       done();
     }, 1200);
@@ -99,10 +108,18 @@ describe('CommandProcessor & Anti-Spam', () => {
     processor = new CommandProcessor(1000, 10);
   });
 
-  it('deve aceitar e normalizar comandos válidos em jogo ativo', () => {
-    const res = processor.processComment('jogador1', '  cura  ', 'PLAYING', false);
-    assert.strictEqual(res.success, true);
-    assert.strictEqual(res.commandType, 'CURA');
+  it('deve aceitar e normalizar comandos válidos em jogo ativo (com ou sem !)', () => {
+    const res1 = processor.processComment('jogador1', '  cura  ', 'PLAYING', false);
+    assert.strictEqual(res1.success, true);
+    assert.strictEqual(res1.commandType, 'CURA');
+
+    const res2 = processor.processComment('jogador2', '!escudo', 'PLAYING', false);
+    assert.strictEqual(res2.success, true);
+    assert.strictEqual(res2.commandType, 'ESCUDO');
+
+    const res3 = processor.processComment('jogador3', '/fogo', 'PLAYING', false);
+    assert.strictEqual(res3.success, true);
+    assert.strictEqual(res3.commandType, 'FOGO');
   });
 
   it('deve aplicar cooldown por usuário para evitar spam', () => {

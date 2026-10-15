@@ -19,4 +19,5 @@ export interface ILiveEventProvider {
   getStatus(): ProviderStatus;
   subscribe(listener: EventListener): () => void;
   emitSimulatedEvent?(event: Partial<NormalizedLiveEvent>): void;
+  onStatusChange?(listener: (status: ProviderStatus) => void): () => void;
 }

@@ -18,6 +18,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 }) => {
   const [providerType, setProviderType] = useState<LiveProviderType>(providerStatus?.type || 'SIMULATOR');
   const [tiktokUsername, setTiktokUsername] = useState(providerStatus?.channelName?.replace('@', '') || '');
+  const [tiktokSessionId, setTiktokSessionId] = useState(settings?.tiktokSessionId || '');
   const [connecting, setConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
@@ -33,7 +34,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setConnecting(true);
     setConnectionError(null);
     try {
-      await api.setProvider('CONNECTED', tiktokUsername.trim());
+      await api.setProvider('CONNECTED', tiktokUsername.trim(), tiktokSessionId.trim());
       onProviderChange();
     } catch (err: any) {
       setConnectionError(err.message || 'Erro ao conectar à live do TikTok.');
@@ -88,7 +89,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </div>
 
         <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div className="form-group" style={{ marginBottom: 0, minWidth: '280px' }}>
+          <div className="form-group" style={{ marginBottom: 0, minWidth: '240px' }}>
             <label className="form-label">Nome de Usuário TikTok (@usuario)</label>
             <input
               type="text"
@@ -96,6 +97,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               placeholder="ex: seucanal"
               value={tiktokUsername}
               onChange={e => setTiktokUsername(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0, minWidth: '220px' }}>
+            <label className="form-label">Session ID Cookie (Opcional)</label>
+            <input
+              type="password"
+              className="form-input"
+              placeholder="Opcional se IP for bloqueado"
+              value={tiktokSessionId}
+              onChange={e => setTiktokSessionId(e.target.value)}
             />
           </div>
 
@@ -131,7 +143,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <h4 style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '8px' }}>Status Atual do Conector</h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', fontSize: '13px' }}>
             <div><strong>Modo:</strong> {providerStatus?.type}</div>
-            <div><strong>Conexão:</strong> {providerStatus?.connected ? '✅ Ativa' : '❌ Inativa'}</div>
+            <div>
+              <strong>Conexão:</strong>{' '}
+              {providerStatus?.connected
+                ? '✅ Ativa e Recebendo Eventos'
+                : providerStatus?.type === 'CONNECTED'
+                ? '⏳ Aguardando Live Online / Reconectando'
+                : '❌ Inativa'}
+            </div>
             <div><strong>Canal:</strong> {providerStatus?.channelName || 'Nenhum'}</div>
             <div><strong>Último Evento:</strong> {providerStatus?.lastEventTime || 'Nenhum evento recente'}</div>
           </div>

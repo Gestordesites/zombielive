@@ -61,9 +61,10 @@ export class CommandProcessor {
 
     // 3. Normalização
     const normalized = text.toUpperCase().replace(/\s+/g, ' ');
+    const cleanCmd = normalized.replace(/^[!/.]/, '').trim();
 
     // 4. Reconhecimento de Votação
-    const voteMatch = normalized.match(/^(?:VOTAR\s*|VOTO\s*|OPCAO\s*|OPÇÃO\s*)?([1-3])$/i);
+    const voteMatch = cleanCmd.match(/^(?:VOTAR\s*|VOTO\s*|OPCAO\s*|OPÇÃO\s*)?([1-3])$/i);
     if (voteMatch) {
       const optionIndex = parseInt(voteMatch[1], 10);
       if (!activeVoteSession) {
@@ -108,17 +109,17 @@ export class CommandProcessor {
     // 6. Reconhecimento de Habilidades
     let matchedCommand: GameCommandType | null = null;
 
-    if (/^(CURA|HEAL|CURAR|VIDA)$/i.test(normalized)) {
+    if (/^(CURA|HEAL|CURAR|VIDA)$/i.test(cleanCmd)) {
       matchedCommand = 'CURA';
-    } else if (/^(ESCUDO|SHIELD|DEFESA|ESCUDAR)$/i.test(normalized)) {
+    } else if (/^(ESCUDO|SHIELD|DEFESA|ESCUDAR|PROTECAO|PROTEÇÃO)$/i.test(cleanCmd)) {
       matchedCommand = 'ESCUDO';
-    } else if (/^(ATAQUE|GOLPE|SLASH|ATACAR|ESPADA)$/i.test(normalized)) {
+    } else if (/^(ATAQUE|GOLPE|SLASH|ATACAR|ESPADA|ATTACK)$/i.test(cleanCmd)) {
       matchedCommand = 'ATAQUE';
-    } else if (/^(FOGO|FIRE|CHAMAS|QUEIMAR)$/i.test(normalized)) {
+    } else if (/^(FOGO|FIRE|CHAMAS|QUEIMAR)$/i.test(cleanCmd)) {
       matchedCommand = 'FOGO';
-    } else if (/^(CONGELAMENTO|GELO|FREEZE|CONGELAR|SLOW)$/i.test(normalized)) {
+    } else if (/^(CONGELAMENTO|CONGELAR|GELO|FREEZE|SLOW)$/i.test(cleanCmd)) {
       matchedCommand = 'CONGELAMENTO';
-    } else if (/^(EXPLOSAO|EXPLOSÃO|BOMBA|BOMB|EXPLODIR|BOOM)$/i.test(normalized)) {
+    } else if (/^(EXPLOSAO|EXPLOSÃO|BOMBA|BOMB|EXPLODIR|BOOM)$/i.test(cleanCmd)) {
       matchedCommand = 'EXPLOSAO';
     }
 

@@ -32,6 +32,7 @@ export class ZombieLiveServer {
   private commandProcessor: CommandProcessor;
   private currentProvider: ILiveEventProvider;
   private providerUnsubscribe: (() => void) | null = null;
+  private providerStatusUnsubscribe: (() => void) | null = null;
 
   private startTime: number = Date.now();
   private eventCounters = {
@@ -72,7 +73,11 @@ export class ZombieLiveServer {
 
     // Provedor inicial
     if (config.liveProvider === 'CONNECTED' && config.tiktokUsername) {
-      this.currentProvider = new TikTokProvider(config.tiktokUsername);
+      this.currentProvider = new TikTokProvider(
+        config.tiktokUsername,
+        config.tiktokSessionId,
+        config.tiktokReconnectInterval
+      );
     } else if (config.liveProvider === 'DISCONNECTED') {
       this.currentProvider = new DisconnectedProvider();
     } else {
@@ -90,6 +95,23 @@ export class ZombieLiveServer {
       initialSettings.commandCooldownPerUserMs,
       initialSettings.commandGlobalRateLimitPerSec
     );
+
+    // Se houver configuração persistida de provedor, aplica
+    if (initialSettings.liveProvider) {
+      const targetUser = initialSettings.tiktokUsername || config.tiktokUsername;
+      const targetSession = initialSettings.tiktokSessionId || config.tiktokSessionId;
+      if (initialSettings.liveProvider === 'CONNECTED' && targetUser) {
+        this.currentProvider = new TikTokProvider(
+          targetUser,
+          targetSession,
+          config.tiktokReconnectInterval
+        );
+      } else if (initialSettings.liveProvider === 'DISCONNECTED') {
+        this.currentProvider = new DisconnectedProvider();
+      } else {
+        this.currentProvider = new SimulatorProvider();
+      }
+    }
 
     this.setupMiddlewares();
     this.setupRoutes();
@@ -207,9 +229,14 @@ export class ZombieLiveServer {
 
     // 6. Provedor de Eventos
     this.app.post('/api/provider', authMid, async (req: Request, res: Response) => {
-      const { provider, username } = req.body;
+      const { provider, username, sessionId } = req.body;
       try {
-        await this.switchProvider(provider, username);
+        await this.switchProvider(provider, username, sessionId);
+        await this.repository.updateSettings({
+          liveProvider: provider,
+          tiktokUsername: username,
+          tiktokSessionId: sessionId
+        });
         res.json({ success: true, provider: this.currentProvider.getStatus() });
       } catch (err: any) {
         res.status(400).json({ error: err.message || 'Falha ao alterar provedor' });
@@ -325,6 +352,11 @@ export class ZombieLiveServer {
 
   private setupSockets(): void {
     this.io.on('connection', (socket: Socket) => {
+      // Se motor estiver ocioso e autoStartMatches ativo, garante início automático
+      if (this.gameEngine.getStatus() === 'IDLE' && this.gameEngine.getSettings().autoStartMatches) {
+        this.gameEngine.ensureAutoStart();
+      }
+
       // Envia snapshot completo imediatamente na conexão
       socket.emit(SOCKET_EVENTS.GAME_STATE_SNAPSHOT, this.gameEngine.getSnapshot());
       socket.emit(SOCKET_EVENTS.PROVIDER_STATUS_CHANGED, this.currentProvider.getStatus());
@@ -355,10 +387,26 @@ export class ZombieLiveServer {
       this.providerUnsubscribe();
       this.providerUnsubscribe = null;
     }
+    if (this.providerStatusUnsubscribe) {
+      this.providerStatusUnsubscribe();
+      this.providerStatusUnsubscribe = null;
+    }
 
     this.providerUnsubscribe = this.currentProvider.subscribe(event => {
       this.handleNormalizedEvent(event);
     });
+
+    if (this.currentProvider.onStatusChange) {
+      this.providerStatusUnsubscribe = this.currentProvider.onStatusChange(status => {
+        const engType = status.connected ? 'CONNECTED' : (status.type === 'CONNECTED' ? 'DISCONNECTED' : status.type);
+        this.gameEngine.setProviderType(engType);
+        this.io.emit(SOCKET_EVENTS.PROVIDER_STATUS_CHANGED, status);
+      });
+    }
+
+    const initialStatus = this.currentProvider.getStatus();
+    const initialEngType = initialStatus.connected ? 'CONNECTED' : (initialStatus.type === 'CONNECTED' ? 'DISCONNECTED' : initialStatus.type);
+    this.gameEngine.setProviderType(initialEngType);
 
     try {
       await this.currentProvider.connect();
@@ -366,10 +414,13 @@ export class ZombieLiveServer {
       console.error('[PROVIDER] Erro ao conectar:', err);
     }
 
-    this.io.emit(SOCKET_EVENTS.PROVIDER_STATUS_CHANGED, this.currentProvider.getStatus());
+    const updatedStatus = this.currentProvider.getStatus();
+    const updatedEngType = updatedStatus.connected ? 'CONNECTED' : (updatedStatus.type === 'CONNECTED' ? 'DISCONNECTED' : updatedStatus.type);
+    this.gameEngine.setProviderType(updatedEngType);
+    this.io.emit(SOCKET_EVENTS.PROVIDER_STATUS_CHANGED, updatedStatus);
   }
 
-  async switchProvider(type: LiveProviderType, username?: string): Promise<void> {
+  async switchProvider(type: LiveProviderType, username?: string, sessionId?: string): Promise<void> {
     if (this.currentProvider) {
       await this.currentProvider.disconnect();
     }
@@ -379,7 +430,11 @@ export class ZombieLiveServer {
       if (!targetUser) {
         throw new Error('Informe o nome de usuário do TikTok para conectar.');
       }
-      this.currentProvider = new TikTokProvider(targetUser);
+      this.currentProvider = new TikTokProvider(
+        targetUser,
+        sessionId || config.tiktokSessionId,
+        config.tiktokReconnectInterval
+      );
     } else if (type === 'DISCONNECTED') {
       this.currentProvider = new DisconnectedProvider();
     } else {

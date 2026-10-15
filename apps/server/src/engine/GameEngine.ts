@@ -16,6 +16,7 @@ import {
   GameSettings,
   NormalizedLiveEvent,
   CompanionPetData,
+  LiveProviderType,
   SOCKET_EVENTS
 } from '@zombie-live/shared';
 import { EventEmitter } from 'events';
@@ -49,6 +50,8 @@ export class GameEngine extends EventEmitter {
   private bossSpecialTimer: number = 0;
   private countdownTimer: number = 0;
   private autoRestartTimeout: NodeJS.Timeout | null = null;
+  private countdownInterval: NodeJS.Timeout | null = null;
+  private providerType: LiveProviderType = 'SIMULATOR';
 
   constructor(settings?: Partial<GameSettings>) {
     super();
@@ -57,13 +60,29 @@ export class GameEngine extends EventEmitter {
     }
     this.resetState();
 
-    // Início automático da primeira partida se configurado
+    // Início automático contínuo se configurado
     if (this.settings.autoStartMatches) {
-      setTimeout(() => {
+      this.ensureAutoStart();
+    }
+  }
+
+  setProviderType(type: LiveProviderType): void {
+    this.providerType = type;
+    this.emitStateUpdated();
+  }
+
+  ensureAutoStart(): void {
+    if (!this.settings.autoStartMatches) return;
+    if (this.status === 'IDLE' && !this.autoRestartTimeout) {
+      const waitSecs = 3;
+      this.addAnnouncement('SYSTEM', `Iniciando partida automaticamente em ${waitSecs} segundos...`);
+      this.emitStateUpdated();
+      this.autoRestartTimeout = setTimeout(() => {
+        this.autoRestartTimeout = null;
         if (this.status === 'IDLE') {
           this.startMatch();
         }
-      }, 1500);
+      }, waitSecs * 1000);
     }
   }
 
@@ -214,6 +233,10 @@ export class GameEngine extends EventEmitter {
       clearTimeout(this.autoRestartTimeout);
       this.autoRestartTimeout = null;
     }
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
 
     if (this.status !== 'IDLE' && this.status !== 'GAME_OVER' && this.status !== 'VICTORY') {
       return;
@@ -224,13 +247,16 @@ export class GameEngine extends EventEmitter {
     this.addAnnouncement('SYSTEM', 'A batalha começará em 3 segundos! Preparem-se!');
     this.emitStateUpdated();
 
-    const countdownInterval = setInterval(() => {
+    this.countdownInterval = setInterval(() => {
       this.countdownTimer--;
       if (this.countdownTimer > 0) {
         this.addAnnouncement('SYSTEM', `Iniciando em ${this.countdownTimer}...`);
         this.emitStateUpdated();
       } else {
-        clearInterval(countdownInterval);
+        if (this.countdownInterval) {
+          clearInterval(this.countdownInterval);
+          this.countdownInterval = null;
+        }
         this.status = 'PLAYING';
         this.matchStartTime = Date.now();
         this.lastTickTime = Date.now();
@@ -271,6 +297,10 @@ export class GameEngine extends EventEmitter {
       clearTimeout(this.autoRestartTimeout);
       this.autoRestartTimeout = null;
     }
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
 
     this.status = result === 'VICTORY' ? 'VICTORY' : result === 'GAME_OVER' ? 'GAME_OVER' : 'IDLE';
     this.stopLoop();
@@ -284,11 +314,12 @@ export class GameEngine extends EventEmitter {
     });
     this.emitStateUpdated();
 
-    // Auto-Restart automático para live contínua 24/7
+    // Auto-Restart automático para live contínua 24/7 (em vitórias ou derrotas)
     if (this.settings.autoStartMatches && (result === 'GAME_OVER' || result === 'VICTORY')) {
-      const waitSecs = this.settings.autoRestartSeconds || 7;
+      const waitSecs = this.settings.autoRestartSeconds || 5;
       this.addAnnouncement('SYSTEM', `Próxima partida iniciando automaticamente em ${waitSecs} segundos...`);
       this.autoRestartTimeout = setTimeout(() => {
+        this.autoRestartTimeout = null;
         if (this.status === 'GAME_OVER' || this.status === 'VICTORY' || this.status === 'IDLE') {
           this.startMatch();
         }
@@ -316,6 +347,10 @@ export class GameEngine extends EventEmitter {
     if (this.loopInterval) {
       clearInterval(this.loopInterval);
       this.loopInterval = null;
+    }
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
     }
   }
 
@@ -865,17 +900,8 @@ export class GameEngine extends EventEmitter {
     this.emit(SOCKET_EVENTS.PLAYER_DAMAGED, { damage: finalDamage, currentHp: this.survivor.hp });
 
     if (this.survivor.hp <= 0) {
-      this.status = 'GAME_OVER';
-      this.stopLoop();
       this.addAnnouncement('GAME_OVER', 'O Sobrevivente caiu! Fim de jogo. A comunidade lutou bravamente!');
-      this.emit(SOCKET_EVENTS.MATCH_FINISHED, {
-        matchId: this.matchId,
-        result: 'GAME_OVER',
-        score: this.score,
-        kills: this.kills,
-        duration: this.matchDurationSeconds
-      });
-      this.emitStateUpdated();
+      this.stopMatch('GAME_OVER');
     }
   }
 
@@ -1269,7 +1295,7 @@ export class GameEngine extends EventEmitter {
       wave: { ...this.waveState },
       collectiveGoal: { ...this.collectiveGoal },
       activeVote: this.activeVote ? { ...this.activeVote } : null,
-      providerType: 'SIMULATOR',
+      providerType: this.providerType,
       totalLikesReceived: this.totalLikesReceived,
       recentAnnouncements: [...this.announcements]
     };
@@ -1286,7 +1312,7 @@ export class GameEngine extends EventEmitter {
       zombiesKilled: this.kills,
       bossesKilled: this.bossesKilled,
       result,
-      providerType: 'SIMULATOR',
+      providerType: this.providerType,
       totalLikes: this.totalLikesReceived,
       totalComments: this.totalCommentsReceived,
       totalGifts: this.totalGiftsReceived

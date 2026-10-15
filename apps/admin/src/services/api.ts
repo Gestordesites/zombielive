@@ -121,10 +121,10 @@ class ApiService {
   }
 
   // Provedor
-  async setProvider(provider: LiveProviderType, username?: string): Promise<{ success: boolean; provider: any }> {
+  async setProvider(provider: LiveProviderType, username?: string, sessionId?: string): Promise<{ success: boolean; provider: any }> {
     return this.request('/api/provider', {
       method: 'POST',
-      body: JSON.stringify({ provider, username })
+      body: JSON.stringify({ provider, username, sessionId })
     });
   }
 

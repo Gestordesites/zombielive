@@ -91,10 +91,10 @@ class ApiService {
         return this.request('/api/diagnostics');
     }
     // Provedor
-    async setProvider(provider, username) {
+    async setProvider(provider, username, sessionId) {
         return this.request('/api/provider', {
             method: 'POST',
-            body: JSON.stringify({ provider, username })
+            body: JSON.stringify({ provider, username, sessionId })
         });
     }
     // Simulador

@@ -229,11 +229,11 @@ export class GameScene extends Phaser.Scene {
       color: '#f8fafc',
       fontStyle: 'bold'
     });
-    this.providerBadgeText = this.add.text(width - 32, 24, '🎮 SIMULADOR', {
+    this.providerBadgeText = this.add.text(width - 32, 24, '⚪ CONECTANDO...', {
       fontFamily: 'Segoe UI, sans-serif',
       fontSize: '17px',
-      color: '#4ade80',
-      backgroundColor: '#14532d',
+      color: '#cbd5e1',
+      backgroundColor: '#334155',
       padding: { x: 14, y: 7 }
     }).setOrigin(1, 0);
     this.hudContainer.add([this.waveText, this.timerText, this.providerBadgeText]);

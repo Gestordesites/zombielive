@@ -7,15 +7,33 @@ const { WebcastPushConnection } = pkg as any;
 export class TikTokProvider implements ILiveEventProvider {
   readonly type: LiveProviderType = 'CONNECTED';
   private listeners: Set<EventListener> = new Set();
+  private statusListeners: Set<(status: ProviderStatus) => void> = new Set();
   private connection: any = null;
   private isConnected: boolean = false;
+  private isConnecting: boolean = false;
+  private shouldStayConnected: boolean = false;
+  private reconnectTimer: NodeJS.Timeout | null = null;
   private channelName: string;
+  private sessionId?: string;
+  private reconnectIntervalMs: number;
   private lastEventTime?: string;
   private recentErrors: string[] = [];
   private lastTotalLikes: number = 0;
 
-  constructor(username: string) {
-    this.channelName = username.trim().replace(/^@/, '');
+  constructor(username: string, sessionId?: string, reconnectIntervalMs: number = 5000) {
+    this.channelName = this.cleanUsername(username);
+    this.sessionId = sessionId?.trim() || undefined;
+    this.reconnectIntervalMs = Math.max(3000, reconnectIntervalMs);
+  }
+
+  private cleanUsername(input: string): string {
+    let clean = (input || '').trim();
+    const urlMatch = clean.match(/@([a-zA-Z0-9_.-]+)/);
+    if (urlMatch) return urlMatch[1];
+    clean = clean.replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/, '');
+    clean = clean.replace(/\/live.*$/, '');
+    clean = clean.replace(/^@/, '').trim();
+    return clean;
   }
 
   async connect(): Promise<void> {
@@ -23,12 +41,54 @@ export class TikTokProvider implements ILiveEventProvider {
       throw new Error('Nome de usuário do TikTok não foi informado.');
     }
 
+    this.shouldStayConnected = true;
+    await this.attemptConnect();
+  }
+
+  private async attemptConnect(): Promise<void> {
+    if (this.isConnecting || this.isConnected || !this.shouldStayConnected) {
+      return;
+    }
+
+    this.isConnecting = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     try {
-      this.connection = new WebcastPushConnection(this.channelName, {
+      if (this.connection) {
+        try {
+          await this.connection.disconnect();
+        } catch (_) {}
+        this.connection = null;
+      }
+
+      const connectionOptions: any = {
         processInitialData: false,
         enableExtendedGiftInfo: true,
-        requestPollingIntervalMs: 2000
-      });
+        enableWebsocketUpgrade: true,
+        requestPollingIntervalMs: 2000,
+        clientParams: {
+          app_language: 'pt-BR',
+          webcast_language: 'pt-BR'
+        },
+        requestHeaders: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Referer': 'https://www.tiktok.com/',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Origin': 'https://www.tiktok.com'
+        },
+        websocketHeaders: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        }
+      };
+
+      if (this.sessionId) {
+        connectionOptions.sessionId = this.sessionId;
+      }
+
+      this.connection = new WebcastPushConnection(this.channelName, connectionOptions);
 
       // Registra eventos do TikTok LIVE
       this.connection.on('chat', (data: any) => {
@@ -49,7 +109,6 @@ export class TikTokProvider implements ILiveEventProvider {
       });
 
       this.connection.on('like', (data: any) => {
-        // TikTok envia likeCount (incremental) e totalLikeCount (acumulado)
         let count = data.likeCount || 1;
         if (data.totalLikeCount) {
           if (this.lastTotalLikes > 0 && data.totalLikeCount > this.lastTotalLikes) {
@@ -75,7 +134,6 @@ export class TikTokProvider implements ILiveEventProvider {
       });
 
       this.connection.on('gift', (data: any) => {
-        // data.giftType === 1 geralmente representa presentes regulares
         this.emitNormalized({
           id: 'tt_gift_' + (data.msgId || Date.now()),
           type: 'GIFT',
@@ -88,7 +146,7 @@ export class TikTokProvider implements ILiveEventProvider {
           },
           data: {
             giftId: String(data.giftId),
-            giftName: data.giftName || 'Presente',
+            giftName: data.giftName || data.describe || 'Presente',
             giftCount: data.repeatCount || 1
           }
         });
@@ -108,30 +166,91 @@ export class TikTokProvider implements ILiveEventProvider {
         });
       });
 
+      this.connection.on('share', (_data: any) => {
+        this.emitNormalized({
+          id: 'tt_share_' + Date.now(),
+          type: 'COMMENT',
+          timestamp: Date.now(),
+          user: {
+            id: 'share_supporter',
+            username: 'Apoiador'
+          },
+          data: {
+            commentText: '!escudo'
+          }
+        });
+      });
+
       this.connection.on('error', (err: any) => {
-        const msg = `[TikTok LIVE] Erro de conexão: ${err?.message || err}`;
+        const msg = `[TikTok LIVE] Erro no conector: ${err?.message || err}`;
         console.error(msg);
         this.addError(msg);
       });
 
       this.connection.on('disconnected', () => {
-        this.isConnected = false;
-        console.warn(`[TikTok LIVE] Conexão com @${this.channelName} foi encerrada.`);
+        this.handleDisconnected('Conexão encerrada pelo TikTok');
+      });
+
+      this.connection.on('streamEnd', () => {
+        this.handleDisconnected('Transmissão ao vivo encerrada');
       });
 
       // Conecta à live do TikTok
       const state = await this.connection.connect();
       this.isConnected = true;
+      this.isConnecting = false;
       console.log(`[TikTok LIVE] Conectado com sucesso à live de @${this.channelName} (Room ID: ${state?.roomId || 'N/A'})`);
+      this.notifyStatusChanged();
     } catch (err: any) {
       this.isConnected = false;
-      const msg = `Falha ao conectar à live do TikTok (@${this.channelName}): ${err?.message || 'Verifique se a live está online.'}`;
+      this.isConnecting = false;
+      const rawMsg = err?.message || String(err);
+      let userFriendly = `Aguardando live de @${this.channelName} entrar online...`;
+      if (rawMsg.includes('User is offline') || rawMsg.includes('LIVE has ended') || rawMsg.includes('room info')) {
+        userFriendly = `Canal @${this.channelName} está offline ou aguardando abertura da live.`;
+      } else if (rawMsg.includes('blocked') || rawMsg.includes('403') || rawMsg.includes('captcha')) {
+        userFriendly = `TikTok solicitou verificação de sessão (IP datacentro). Configure TIKTOK_SESSION_ID no .env.`;
+      }
+      const msg = `[TikTok LIVE] ${userFriendly} (${rawMsg})`;
+      console.warn(msg);
       this.addError(msg);
-      throw new Error(msg);
+      this.notifyStatusChanged();
+
+      this.scheduleReconnect();
     }
   }
 
+  private handleDisconnected(reason: string): void {
+    this.isConnected = false;
+    this.isConnecting = false;
+    const msg = `[TikTok LIVE] @${this.channelName}: ${reason}. Reconectando em ${Math.round(this.reconnectIntervalMs / 1000)}s...`;
+    console.warn(msg);
+    this.addError(msg);
+    this.notifyStatusChanged();
+
+    this.scheduleReconnect();
+  }
+
+  private scheduleReconnect(): void {
+    if (!this.shouldStayConnected) return;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.shouldStayConnected && !this.isConnected) {
+        this.attemptConnect().catch(e => {
+          console.error('[TikTok LIVE] Erro no loop de reconexão:', e);
+        });
+      }
+    }, this.reconnectIntervalMs);
+  }
+
   async disconnect(): Promise<void> {
+    this.shouldStayConnected = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.connection) {
       try {
         await this.connection.disconnect();
@@ -141,6 +260,8 @@ export class TikTokProvider implements ILiveEventProvider {
       this.connection = null;
     }
     this.isConnected = false;
+    this.isConnecting = false;
+    this.notifyStatusChanged();
   }
 
   getStatus(): ProviderStatus {
@@ -149,7 +270,7 @@ export class TikTokProvider implements ILiveEventProvider {
       connected: this.isConnected,
       channelName: this.channelName ? `@${this.channelName}` : undefined,
       lastEventTime: this.lastEventTime,
-      supportedEvents: ['LIKE', 'COMMENT', 'GIFT', 'FOLLOW'],
+      supportedEvents: ['LIKE', 'COMMENT', 'GIFT', 'FOLLOW', 'SHARE'],
       unsupportedEvents: ['VOTE (emulado via comentários)'],
       recentErrors: this.recentErrors
     };
@@ -158,6 +279,22 @@ export class TikTokProvider implements ILiveEventProvider {
   subscribe(listener: EventListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  onStatusChange(listener: (status: ProviderStatus) => void): () => void {
+    this.statusListeners.add(listener);
+    return () => this.statusListeners.delete(listener);
+  }
+
+  private notifyStatusChanged(): void {
+    const status = this.getStatus();
+    for (const listener of this.statusListeners) {
+      try {
+        listener(status);
+      } catch (err) {
+        console.error('[TikTok LIVE] Erro no ouvinte de status:', err);
+      }
+    }
   }
 
   private emitNormalized(event: NormalizedLiveEvent): void {

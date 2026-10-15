@@ -21,6 +21,7 @@ export const config = {
 
   liveProvider: (process.env.LIVE_PROVIDER || 'SIMULATOR') as 'SIMULATOR' | 'CONNECTED' | 'DISCONNECTED',
   tiktokUsername: process.env.TIKTOK_USERNAME || '',
+  tiktokSessionId: process.env.TIKTOK_SESSION_ID || '',
   tiktokReconnectInterval: parseInt(process.env.TIKTOK_RECONNECT_INTERVAL || '5000', 10),
   tiktokDebug: process.env.TIKTOK_DEBUG === 'true',
 
