@@ -263,16 +263,20 @@ export class ZombieLiveServer {
     ];
     const adminDist = adminDistPaths.find(p => fs.existsSync(p));
 
+    // 1. Painel Administrativo em /admin
+    if (adminDist) {
+      this.app.use('/admin', express.static(adminDist));
+      this.app.get(['/admin', '/admin/*'], (_req, res) => res.sendFile(path.join(adminDist, 'index.html')));
+    }
+
+    // 2. Jogo Phaser em /live, /game e na raiz /
     if (gameDist) {
       this.app.use('/live', express.static(gameDist));
       this.app.use('/game', express.static(gameDist));
-      this.app.get('/live', (_req, res) => res.sendFile(path.join(gameDist, 'index.html')));
+      this.app.use(express.static(gameDist));
+      this.app.get(['/live', '/live/*'], (_req, res) => res.sendFile(path.join(gameDist, 'index.html')));
+      this.app.get(['/game', '/game/*'], (_req, res) => res.sendFile(path.join(gameDist, 'index.html')));
       this.app.get('/', (_req, res) => res.sendFile(path.join(gameDist, 'index.html')));
-    }
-
-    if (adminDist) {
-      this.app.use('/admin', express.static(adminDist));
-      this.app.get('/admin*', (_req, res) => res.sendFile(path.join(adminDist, 'index.html')));
     }
   }
 
