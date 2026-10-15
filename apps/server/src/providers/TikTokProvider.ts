@@ -2,7 +2,8 @@ import { LiveProviderType, NormalizedLiveEvent } from '@zombie-live/shared';
 import { ILiveEventProvider, ProviderStatus, EventListener } from './ILiveEventProvider.js';
 // @ts-ignore - tiktok-live-connector é importado dinamicamente ou via CJS
 import pkg from 'tiktok-live-connector';
-const { WebcastPushConnection } = pkg as any;
+const { TikTokLiveConnection, WebcastPushConnection } = pkg as any;
+const LiveConnectionClass = TikTokLiveConnection || WebcastPushConnection;
 
 export class TikTokProvider implements ILiveEventProvider {
   readonly type: LiveProviderType = 'CONNECTED';
@@ -66,7 +67,7 @@ export class TikTokProvider implements ILiveEventProvider {
 
       const connectionOptions: any = {
         processInitialData: false,
-        enableExtendedGiftInfo: true,
+        enableExtendedGiftInfo: false,
         enableWebsocketUpgrade: true,
         requestPollingIntervalMs: 2000,
         clientParams: {
@@ -99,7 +100,7 @@ export class TikTokProvider implements ILiveEventProvider {
         };
       }
 
-      this.connection = new WebcastPushConnection(this.channelName, connectionOptions);
+      this.connection = new LiveConnectionClass(this.channelName, connectionOptions);
 
       // Registra eventos do TikTok LIVE
       this.connection.on('chat', (data: any) => {

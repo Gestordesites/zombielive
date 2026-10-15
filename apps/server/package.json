@@ -24,7 +24,7 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.1",
     "socket.io": "^4.8.1",
-    "tiktok-live-connector": "^1.2.2",
+    "tiktok-live-connector": "^2.5.0",
     "typescript": "^5.7.3"
   },
   "devDependencies": {
