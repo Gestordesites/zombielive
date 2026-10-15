@@ -16,8 +16,10 @@
     "dev": "concurrently -k -n \"SERVER,GAME,ADMIN\" -c \"blue,green,magenta\" \"npm run dev:server\" \"npm run dev:game\" \"npm run dev:admin\"",
     "start": "node apps/server/dist/index.js"
   },
-  "devDependencies": {
-    "concurrently": "^9.1.2",
+  "dependencies": {
     "typescript": "^5.7.3"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }
