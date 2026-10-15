@@ -37,6 +37,15 @@ export class TikTokProvider implements ILiveEventProvider {
     return clean;
   }
 
+  private extractUser(data: any): { id: string; username: string; nickname?: string; avatarUrl?: string } {
+    const user = data?.user || {};
+    const id = String(user.id || user.userId || data.userId || data.uniqueId || 'anon');
+    const username = String(user.displayId || user.uniqueId || data.uniqueId || user.nickname || data.nickname || 'Espectador');
+    const nickname = user.nickname || data.nickname || username;
+    const avatarUrl = user.avatarThumb?.urlList?.[0] || user.avatarMedium?.urlList?.[0] || user.avatarLarge?.urlList?.[0] || data.profilePictureUrl || user.profilePictureUrl;
+    return { id, username, nickname, avatarUrl };
+  }
+
   async connect(): Promise<void> {
     if (!this.channelName) {
       throw new Error('Nome de usuário do TikTok não foi informado.');
@@ -104,93 +113,107 @@ export class TikTokProvider implements ILiveEventProvider {
 
       // Registra eventos do TikTok LIVE
       this.connection.on('chat', (data: any) => {
+        const text = String(data.content || data.comment || data.commentText || '').trim();
+        const user = this.extractUser(data);
+        console.log(`[TikTok LIVE] Comentário recebido de @${user.username}: "${text}"`);
         this.emitNormalized({
-          id: 'tt_' + (data.msgId || Date.now()),
+          id: 'tt_' + (data.msgId || data.common?.msgId || Date.now()),
           type: 'COMMENT',
           timestamp: Date.now(),
-          user: {
-            id: String(data.userId || data.uniqueId || 'anon'),
-            username: data.uniqueId || data.nickname || 'Espectador',
-            nickname: data.nickname,
-            avatarUrl: data.profilePictureUrl
-          },
+          user,
           data: {
-            commentText: data.comment
+            commentText: text
           }
         });
       });
 
       this.connection.on('like', (data: any) => {
-        let count = data.likeCount || 1;
-        if (data.totalLikeCount) {
-          if (this.lastTotalLikes > 0 && data.totalLikeCount > this.lastTotalLikes) {
-            count = data.totalLikeCount - this.lastTotalLikes;
-          }
-          this.lastTotalLikes = data.totalLikeCount;
-        }
+        const count = Number(data.count || data.likeCount || 1);
+        const total = data.total ? Number(data.total) : (data.totalLikeCount ? Number(data.totalLikeCount) : undefined);
+        const user = this.extractUser(data);
 
         this.emitNormalized({
           id: 'tt_like_' + Date.now() + '_' + Math.random(),
           type: 'LIKE',
           timestamp: Date.now(),
-          user: {
-            id: String(data.userId || data.uniqueId || 'anon'),
-            username: data.uniqueId || data.nickname || 'Espectador',
-            nickname: data.nickname
-          },
+          user,
           data: {
             likeCount: count,
-            totalLikes: data.totalLikeCount
+            totalLikes: total
           }
         });
       });
 
       this.connection.on('gift', (data: any) => {
+        const user = this.extractUser(data);
+        const giftId = String(data.giftId || data.gift?.id || 'gift');
+        const giftName = data.gift?.name || data.gift?.describe || data.giftName || data.describe || 'Presente';
+        const giftCount = Number(data.repeatCount || data.groupCount || 1);
+        console.log(`[TikTok LIVE] Presente recebido de @${user.username}: ${giftName} x${giftCount}`);
+
         this.emitNormalized({
-          id: 'tt_gift_' + (data.msgId || Date.now()),
+          id: 'tt_gift_' + (data.msgId || data.common?.msgId || Date.now()),
           type: 'GIFT',
           timestamp: Date.now(),
-          user: {
-            id: String(data.userId || data.uniqueId || 'anon'),
-            username: data.uniqueId || data.nickname || 'Espectador',
-            nickname: data.nickname,
-            avatarUrl: data.profilePictureUrl
-          },
+          user,
           data: {
-            giftId: String(data.giftId),
-            giftName: data.giftName || data.describe || 'Presente',
-            giftCount: data.repeatCount || 1
+            giftId,
+            giftName,
+            giftCount
           }
         });
       });
 
       this.connection.on('follow', (data: any) => {
+        const user = this.extractUser(data);
+        console.log(`[TikTok LIVE] Novo seguidor: @${user.username}`);
         this.emitNormalized({
           id: 'tt_follow_' + Date.now(),
           type: 'FOLLOW',
           timestamp: Date.now(),
-          user: {
-            id: String(data.userId || data.uniqueId || 'anon'),
-            username: data.uniqueId || data.nickname || 'Novo Seguidor',
-            nickname: data.nickname
-          },
+          user,
           data: {}
         });
       });
 
-      this.connection.on('share', (_data: any) => {
+      this.connection.on('share', (data: any) => {
+        const user = this.extractUser(data);
+        console.log(`[TikTok LIVE] Compartilhamento por @${user.username}`);
         this.emitNormalized({
           id: 'tt_share_' + Date.now(),
           type: 'COMMENT',
           timestamp: Date.now(),
-          user: {
-            id: 'share_supporter',
-            username: 'Apoiador'
-          },
+          user,
           data: {
             commentText: '!escudo'
           }
         });
+      });
+
+      this.connection.on('social', (data: any) => {
+        const user = this.extractUser(data);
+        const displayKey = data.common?.displayText?.key || '';
+        if (displayKey.includes('follow')) {
+          console.log(`[TikTok LIVE] Social: novo seguidor @${user.username}`);
+          this.emitNormalized({
+            id: 'tt_social_follow_' + Date.now(),
+            type: 'FOLLOW',
+            timestamp: Date.now(),
+            user,
+            data: {}
+          });
+        } else if (displayKey.includes('share')) {
+          console.log(`[TikTok LIVE] Social: compartilhamento de @${user.username}`);
+          this.emitNormalized({
+            id: 'tt_social_share_' + Date.now(),
+            type: 'COMMENT',
+            timestamp: Date.now(),
+            user,
+            data: {
+              commentText: '!escudo'
+            }
+          });
+        }
       });
 
       this.connection.on('error', (err: any) => {

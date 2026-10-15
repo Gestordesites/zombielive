@@ -461,6 +461,12 @@ export class ZombieLiveServer {
     // 2. Processa Comentários e Comandos
     if (event.type === 'COMMENT') {
       const comment = event.data.commentText || '';
+
+      // Se a partida estiver IDLE e o reinício automático estiver ativo, inicia imediatamente
+      if (this.gameEngine.getStatus() === 'IDLE' && this.gameEngine.getSettings().autoStartMatches) {
+        this.gameEngine.ensureAutoStart();
+      }
+
       const snapshot = this.gameEngine.getSnapshot();
       const hasActiveVote = !!snapshot.activeVote?.active;
 
