@@ -88,6 +88,17 @@ export class TikTokProvider implements ILiveEventProvider {
         connectionOptions.sessionId = this.sessionId;
       }
 
+      const signApiKey = process.env.TIKTOK_SIGN_API_KEY || process.env.EULERSTREAM_API_KEY;
+      if (signApiKey) {
+        connectionOptions.signProviderOptions = {
+          params: { apiKey: signApiKey },
+          headers: {
+            'Authorization': `Bearer ${signApiKey}`,
+            'X-Argus-X-ApiKey': signApiKey
+          }
+        };
+      }
+
       this.connection = new WebcastPushConnection(this.channelName, connectionOptions);
 
       // Registra eventos do TikTok LIVE
